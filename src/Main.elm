@@ -17,6 +17,15 @@ main =
 
 
 
+-- EXTRA
+
+
+findMap : (a -> Maybe b) -> List a -> Maybe b
+findMap pred xs =
+    List.filterMap pred xs |> List.head
+
+
+
 -- TYPES
 
 
@@ -24,38 +33,151 @@ type alias Currency =
     String
 
 
+type alias Date =
+    String
+
+
+type alias Period =
+    String
+
+
+type alias Rate =
+    Float
+
+
 type ValueWithUnit
     = MonetaryAmount Currency Float
-    | Rate Float
     | Amount Float
 
 
+value : ValueWithUnit -> Float
+value valueWithUnit =
+    case valueWithUnit of
+        MonetaryAmount _ value ->
+            value
+
+        Amount value ->
+            value
+
+
 type Scale
-    = Scale (List ( ValueWithUnit, ValueWithUnit ))
+    = Scale Date (List ( ValueWithUnit, Rate ))
 
 
-scale : (number -> ValueWithUnit) -> (number -> ValueWithUnit) -> List ( number, number ) -> Scale
-scale thresholdTagger valueTagger brackets =
-    Scale
+type alias TimeChangingScale =
+    List
+        { thresholds : List ( Date, Date, ValueWithUnit )
+        , rates : List ( Date, Date, Rate )
+        }
+
+
+timeChangingScale :
+    (number -> ValueWithUnit)
+    -> List
+        { thresholds : List ( Date, Date, number )
+        , rates : List ( Date, Date, Rate )
+        }
+    -> TimeChangingScale
+timeChangingScale thresholdTagger brackets =
+    List.map
+        (\{ thresholds, rates } ->
+            { thresholds =
+                List.map
+                    (\( start, stop, threshold ) -> ( start, stop, thresholdTagger threshold ))
+                    thresholds
+            , rates = rates
+            }
+        )
+        brackets
+
+
+scale : Date -> (number -> ValueWithUnit) -> List ( number, Rate ) -> Scale
+scale date thresholdTagger brackets =
+    Scale date
         (List.map
-            (\( threshold, value ) ->
-                ( thresholdTagger threshold, valueTagger value )
+            (\( threshold, rate ) ->
+                ( thresholdTagger threshold, rate )
             )
             brackets
         )
 
 
-brackets : Scale -> List ( ValueWithUnit, ValueWithUnit )
-brackets (Scale brackets) =
-    brackets
+atDate : Date -> TimeChangingScale -> Scale
+atDate date scale =
+    let
+        findForDate xs =
+            findMap
+                (\( start, stop, x ) ->
+                    if start <= date && date <= stop then
+                        Just x
+                    else
+                        Nothing
+                )
+                xs
+    in
+        Scale date
+            (List.filterMap
+                (\{ thresholds, rates } ->
+                    Maybe.map2 (,) (findForDate thresholds) (findForDate rates)
+                )
+                scale
+            )
 
 
-formatUnit : ValueWithUnit -> String
-formatUnit unit =
+eval : ValueWithUnit -> Scale -> ValueWithUnit
+eval valueWithUnit (Scale _ brackets) =
+    {-
+       ( 151956, 0.45 ) (value - 151956) * 0.45
+       ( 71754, 0.41 )  + (value - 71754) * 0.41
+       ( 26764, 0.3 )   + (value - 26764) * 0.3
+       ( 9690, 0.14 )   + (value - 9690) * 0.14
+       ( 0, 0 )         + (value - 0) * 0
+
+       50000
+       ( 26764, 0.3 )   + (50000 - 26764) * 0.3
+       ( 9690, 0.14 )   + (26764 - 9690) * 0.14
+       ( 0, 0 )         + (9690 - 0) * 0
+       50000
+       ( 26764, Nothing, 0.3 )
+       ( 9690, Just 26764, 0.14 )
+       ( 0, Just 9690, 0 )
+    -}
+    let
+        valueValue =
+            value valueWithUnit
+
+        matchingBrackets =
+            brackets
+                |> List.reverse
+                |> List.filter (\( threshold, _ ) -> valueValue > (value threshold))
+    in
+        List.map2
+            (\( threshold, rate ) previousThreshold ->
+                let
+                    thresholdValue =
+                        value threshold
+                in
+                    case previousThreshold of
+                        Nothing ->
+                            (valueValue - thresholdValue) * rate
+
+                        Just previousThreshold ->
+                            ((value previousThreshold) - thresholdValue) * rate
+            )
+            matchingBrackets
+            (Nothing
+                :: (List.map (\( threshold, _ ) -> Just threshold)
+                        (List.take ((List.length matchingBrackets) - 1) matchingBrackets)
+                   )
+            )
+            |> List.sum
+            |> -- TODO Do not hardcode this.
+               MonetaryAmount "€"
+
+
+formatValueWithUnit : ValueWithUnit -> String
+formatValueWithUnit unit =
     case unit of
-        Rate float ->
-            Numeral.formatWithLanguage Languages.French.lang "0.[00] %" float
-
         MonetaryAmount _ float ->
             Numeral.formatWithLanguage Languages.French.lang "0.[00] a$" float
 
@@ -69,16 +191,17 @@ formatUnit unit =
 
 type alias Model =
     { scales : List Scale
+    , timeChangingScales : List TimeChangingScale
     }
 
 
 initialModel : Model
 initialModel =
     let
-        bareme_impot_senegal =
+        baremeImpotSenegal =
             scale
+                "2013"
                 (MonetaryAmount "CFA")
-                Rate
                 [ ( 0, 0 )
                 , ( 630000, 0.2 )
                 , ( 1500000, 0.3 )
@@ -87,10 +210,22 @@ initialModel =
                 , ( 13500000, 0.4 )
                 ]
 
-        bareme_impot_france_2015 =
+        baremeImpotFrance2014 =
             scale
+                "2014"
                 (MonetaryAmount "€")
-                Rate
+                [ ( 0, 0 )
+                , ( 6011, 0.055 )
+                , ( 11991, 0.14 )
+                , ( 26631, 0.3 )
+                , ( 71397, 0.41 )
+                , ( 151200, 0.45 )
+                ]
+
+        baremeImpotFrance2015 =
+            scale
+                "2015"
+                (MonetaryAmount "€")
                 [ ( 0, 0 )
                 , ( 9690, 0.14 )
                 , ( 26764, 0.3 )
@@ -98,10 +233,65 @@ initialModel =
                 , ( 151956, 0.45 )
                 ]
 
-        bareme_reductions_pour_charge_de_famille =
+        baremeImpotFrance =
+            timeChangingScale
+                (MonetaryAmount "€")
+                [ { thresholds =
+                        [ ( "2014-01-01", "2015-12-31", 0 )
+                        ]
+                  , rates =
+                        [ ( "2014-01-01", "2015-12-31", 0 )
+                        ]
+                  }
+                , { thresholds =
+                        [ ( "2014-01-01", "2014-12-31", 6011 )
+                        , ( "2015-01-01", "2015-12-31", 9690 )
+                        ]
+                  , rates =
+                        [ ( "2014-01-01", "2014-12-31", 0.055 )
+                        , ( "2015-01-01", "2015-12-31", 0.14 )
+                        ]
+                  }
+                , { thresholds =
+                        [ ( "2014-01-01", "2014-12-31", 11991 )
+                        , ( "2015-01-01", "2015-12-31", 26764 )
+                        ]
+                  , rates =
+                        [ ( "2014-01-01", "2014-12-31", 0.14 )
+                        , ( "2015-01-01", "2015-12-31", 0.3 )
+                        ]
+                  }
+                , { thresholds =
+                        [ ( "2014-01-01", "2014-12-31", 26631 )
+                        , ( "2015-01-01", "2015-12-31", 71754 )
+                        ]
+                  , rates =
+                        [ ( "2014-01-01", "2014-12-31", 0.3 )
+                        , ( "2015-01-01", "2015-12-31", 0.41 )
+                        ]
+                  }
+                , { thresholds =
+                        [ ( "2014-01-01", "2014-12-31", 71397 )
+                        , ( "2015-01-01", "2015-12-31", 151956 )
+                        ]
+                  , rates =
+                        [ ( "2014-01-01", "2014-12-31", 0.41 )
+                        , ( "2015-01-01", "2015-12-31", 0.45 )
+                        ]
+                  }
+                , { thresholds =
+                        [ ( "2014-01-01", "2014-12-31", 151200 )
+                        ]
+                  , rates =
+                        [ ( "2014-01-01", "2014-12-31", 0.45 )
+                        ]
+                  }
+                ]
+
+        baremeReductionsPourChargeDeFamille =
             scale
+                "2013"
                 Amount
-                Rate
                 [ ( 1, 0 )
                 , ( 1.5, 0.1 )
                 , ( 2, 0.15 )
@@ -114,9 +304,13 @@ initialModel =
                 ]
     in
         { scales =
-            [ bareme_impot_senegal
-            , bareme_impot_france_2015
-            , bareme_reductions_pour_charge_de_famille
+            [ baremeImpotFrance2014
+            , baremeImpotFrance2015
+            , baremeImpotSenegal
+            , baremeReductionsPourChargeDeFamille
+            ]
+        , timeChangingScales =
+            [ baremeImpotFrance
             ]
         }
 
@@ -157,21 +351,61 @@ subscriptions model =
 view : Model -> Html msg
 view model =
     div []
-        (List.map viewScale model.scales)
+        [ ul []
+            (List.map
+                (\scale ->
+                    li []
+                        [ viewScale scale ]
+                )
+                model.scales
+            )
+        , ul []
+            (List.map
+                (\timeChangingScale ->
+                    ul []
+                        (List.map
+                            (\date ->
+                                li []
+                                    (let
+                                        scale =
+                                            timeChangingScale |> atDate date
+                                     in
+                                        [ viewScale scale ]
+                                            ++ (List.map
+                                                    (\value ->
+                                                        p []
+                                                            [ text
+                                                                ("For "
+                                                                    ++ (formatValueWithUnit value)
+                                                                    ++ ": "
+                                                                    ++ (formatValueWithUnit
+                                                                            (eval (value) scale)
+                                                                       )
+                                                                )
+                                                            ]
+                                                    )
+                                                    ([ 1000, 15000, 50000 ] |> List.map (MonetaryAmount "€"))
+                                               )
+                                    )
+                            )
+                            [ "2014-01-01", "2015-01-01" ]
+                        )
+                )
+                model.timeChangingScales
+            )
+        ]
 
 
 viewScale : Scale -> Html msg
-viewScale scale =
-    let
-        scaleBrackets =
-            brackets scale
-    in
-        tableWithBorders
+viewScale (Scale date brackets) =
+    div []
+        [ text date
+        , tableWithBorders
             (List.map2
-                (\( threshold, value ) nextThreshold ->
+                (\( threshold, rate ) nextThreshold ->
                     [ let
                         toThreshold threshold =
-                            "jusqu'à " ++ (formatUnit threshold)
+                            "jusqu'à " ++ (formatValueWithUnit threshold)
                       in
                         case ( threshold, nextThreshold ) of
                             ( MonetaryAmount _ 0, Just nextThreshold ) ->
@@ -181,20 +415,26 @@ viewScale scale =
                                 text (toThreshold nextThreshold)
 
                             ( threshold, Just nextThreshold ) ->
-                                text ("de " ++ (formatUnit threshold) ++ " à " ++ (formatUnit nextThreshold))
+                                text ("de " ++ (formatValueWithUnit threshold) ++ " à " ++ (formatValueWithUnit nextThreshold))
 
                             ( threshold, Nothing ) ->
-                                text ("supérieur à " ++ (formatUnit threshold))
-                    , text (formatUnit value)
+                                text ("supérieur à " ++ (formatValueWithUnit threshold))
+                    , text
+                        (Numeral.formatWithLanguage
+                            Languages.French.lang
+                            "0.[00] %"
+                            rate
+                        )
                     ]
                 )
-                scaleBrackets
-                ((List.drop 1 scaleBrackets
+                brackets
+                ((List.drop 1 brackets
                     |> List.map (\( threshold, _ ) -> Just threshold)
                  )
                     ++ [ Nothing ]
                 )
             )
+        ]
 
 
 
