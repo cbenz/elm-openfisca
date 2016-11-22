@@ -17,15 +17,6 @@ main =
 
 
 
--- EXTRA
-
-
-findMap : (a -> Maybe b) -> List a -> Maybe b
-findMap pred xs =
-    List.filterMap pred xs |> List.head
-
-
-
 -- TYPES
 
 
@@ -60,8 +51,8 @@ value valueWithUnit =
             value
 
 
-type Scale
-    = Scale Date (List ( ValueWithUnit, Rate ))
+type alias Scale =
+    List ( ValueWithUnit, Rate )
 
 
 type alias TimeChangingScale =
@@ -91,22 +82,18 @@ timeChangingScale thresholdTagger brackets =
         brackets
 
 
-scale : Date -> (number -> ValueWithUnit) -> List ( number, Rate ) -> Scale
-scale date thresholdTagger brackets =
-    Scale date
-        (List.map
-            (\( threshold, rate ) ->
-                ( thresholdTagger threshold, rate )
-            )
-            brackets
-        )
+scale : (number -> ValueWithUnit) -> List ( number, Rate ) -> Scale
+scale thresholdTagger brackets =
+    List.map
+        (\( threshold, rate ) -> ( thresholdTagger threshold, rate ))
+        brackets
 
 
 atDate : Date -> TimeChangingScale -> Scale
 atDate date scale =
     let
         findForDate xs =
-            findMap
+            List.filterMap
                 (\( start, stop, x ) ->
                     if start <= date && date <= stop then
                         Just x
@@ -114,18 +101,17 @@ atDate date scale =
                         Nothing
                 )
                 xs
+                |> List.head
     in
-        Scale date
-            (List.filterMap
-                (\{ thresholds, rates } ->
-                    Maybe.map2 (,) (findForDate thresholds) (findForDate rates)
-                )
-                scale
+        List.filterMap
+            (\{ thresholds, rates } ->
+                Maybe.map2 (,) (findForDate thresholds) (findForDate rates)
             )
+            scale
 
 
 eval : ValueWithUnit -> Scale -> ValueWithUnit
-eval valueWithUnit (Scale _ brackets) =
+eval valueWithUnit scale =
     {-
        ( 151956, 0.45 ) (value - 151956) * 0.45
        ( 71754, 0.41 )  + (value - 71754) * 0.41
@@ -147,7 +133,7 @@ eval valueWithUnit (Scale _ brackets) =
             value valueWithUnit
 
         matchingBrackets =
-            brackets
+            scale
                 |> List.reverse
                 |> List.filter (\( threshold, _ ) -> valueValue > (value threshold))
     in
@@ -198,9 +184,8 @@ type alias Model =
 initialModel : Model
 initialModel =
     let
-        baremeImpotSenegal =
+        baremeImpotSenegal2013 =
             scale
-                "2013"
                 (MonetaryAmount "CFA")
                 [ ( 0, 0 )
                 , ( 630000, 0.2 )
@@ -212,7 +197,6 @@ initialModel =
 
         baremeImpotFrance2014 =
             scale
-                "2014"
                 (MonetaryAmount "€")
                 [ ( 0, 0 )
                 , ( 6011, 0.055 )
@@ -224,7 +208,6 @@ initialModel =
 
         baremeImpotFrance2015 =
             scale
-                "2015"
                 (MonetaryAmount "€")
                 [ ( 0, 0 )
                 , ( 9690, 0.14 )
@@ -290,7 +273,6 @@ initialModel =
 
         baremeReductionsPourChargeDeFamille =
             scale
-                "2013"
                 Amount
                 [ ( 1, 0 )
                 , ( 1.5, 0.1 )
@@ -306,7 +288,7 @@ initialModel =
         { scales =
             [ baremeImpotFrance2014
             , baremeImpotFrance2015
-            , baremeImpotSenegal
+            , baremeImpotSenegal2013
             , baremeReductionsPourChargeDeFamille
             ]
         , timeChangingScales =
@@ -378,9 +360,7 @@ view model =
                                                                 ("For "
                                                                     ++ (formatValueWithUnit value)
                                                                     ++ ": "
-                                                                    ++ (formatValueWithUnit
-                                                                            (eval (value) scale)
-                                                                       )
+                                                                    ++ (formatValueWithUnit (eval value scale))
                                                                 )
                                                             ]
                                                     )
@@ -397,10 +377,9 @@ view model =
 
 
 viewScale : Scale -> Html msg
-viewScale (Scale date brackets) =
+viewScale scale =
     div []
-        [ text date
-        , tableWithBorders
+        [ tableWithBorders
             (List.map2
                 (\( threshold, rate ) nextThreshold ->
                     [ let
@@ -427,8 +406,8 @@ viewScale (Scale date brackets) =
                         )
                     ]
                 )
-                brackets
-                ((List.drop 1 brackets
+                scale
+                ((List.drop 1 scale
                     |> List.map (\( threshold, _ ) -> Just threshold)
                  )
                     ++ [ Nothing ]
