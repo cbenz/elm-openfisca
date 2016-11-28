@@ -292,7 +292,17 @@ subscriptions model =
 view : Model -> Html msg
 view model =
     div []
-        [ p []
+        [ h1 [] [ text "elm-openfisca playground" ]
+        , p []
+            [ text "Source code:"
+            , let
+                url =
+                    "https://github.com/cbenz/elm-openfisca"
+              in
+                a [ href url ] [ text url ]
+            ]
+        , p
+            []
             [ viewArithmeticOperation model.arithmeticOperation ]
         , ul
             []
