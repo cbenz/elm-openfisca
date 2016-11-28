@@ -291,7 +291,7 @@ subscriptions model =
 
 view : Model -> Html msg
 view model =
-    div []
+    div [ style [ ( "margin", "1em" ) ] ]
         [ h1 [] [ text "elm-openfisca playground" ]
         , p []
             [ text "Source code:"
