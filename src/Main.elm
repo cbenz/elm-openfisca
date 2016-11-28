@@ -1,9 +1,12 @@
 module Main exposing (..)
 
+import Formulas exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Languages.French
 import Numeral
+import OpenFisca exposing (..)
+import Types exposing (..)
 
 
 main : Program Never Model Msg
@@ -20,27 +23,6 @@ main =
 -- TYPES
 
 
-type alias Currency =
-    String
-
-
-type alias Date =
-    String
-
-
-type alias Period =
-    String
-
-
-type alias Rate =
-    Float
-
-
-type ValueWithUnit
-    = MonetaryAmount Currency Float
-    | Amount Float
-
-
 value : ValueWithUnit -> Float
 value valueWithUnit =
     case valueWithUnit of
@@ -49,17 +31,6 @@ value valueWithUnit =
 
         Amount value ->
             value
-
-
-type alias Scale =
-    List ( ValueWithUnit, Rate )
-
-
-type alias TimeChangingScale =
-    List
-        { thresholds : List ( Date, Date, ValueWithUnit )
-        , rates : List ( Date, Date, Rate )
-        }
 
 
 timeChangingScale :
@@ -110,24 +81,8 @@ atDate date scale =
             scale
 
 
-eval : ValueWithUnit -> Scale -> ValueWithUnit
-eval valueWithUnit scale =
-    {-
-       ( 151956, 0.45 ) (value - 151956) * 0.45
-       ( 71754, 0.41 )  + (value - 71754) * 0.41
-       ( 26764, 0.3 )   + (value - 26764) * 0.3
-       ( 9690, 0.14 )   + (value - 9690) * 0.14
-       ( 0, 0 )         + (value - 0) * 0
-
-       50000
-       ( 26764, 0.3 )   + (50000 - 26764) * 0.3
-       ( 9690, 0.14 )   + (26764 - 9690) * 0.14
-       ( 0, 0 )         + (9690 - 0) * 0
-       50000
-       ( 26764, Nothing, 0.3 )
-       ( 9690, Just 26764, 0.14 )
-       ( 0, Just 9690, 0 )
-    -}
+calculate : ValueWithUnit -> Scale -> ValueWithUnit
+calculate valueWithUnit scale =
     let
         valueValue =
             value valueWithUnit
@@ -176,7 +131,8 @@ formatValueWithUnit unit =
 
 
 type alias Model =
-    { scales : List Scale
+    { arithmeticOperation : ArithmeticOperation
+    , scales : List Scale
     , timeChangingScales : List TimeChangingScale
     }
 
@@ -285,7 +241,10 @@ initialModel =
                 , ( 5, 0.45 )
                 ]
     in
-        { scales =
+        { arithmeticOperation =
+            impotRevenus (Number 50000) baremeImpotSenegal2013 (BOFalse) (BOTrue) (Number 2)
+            -- nbParts BOFalse BOFalse (Number 0)
+        , scales =
             [ baremeImpotFrance2014
             , baremeImpotFrance2015
             , baremeImpotSenegal2013
@@ -333,7 +292,10 @@ subscriptions model =
 view : Model -> Html msg
 view model =
     div []
-        [ ul []
+        [ p []
+            [ viewArithmeticOperation model.arithmeticOperation ]
+        , ul
+            []
             (List.map
                 (\scale ->
                     li []
@@ -360,7 +322,7 @@ view model =
                                                                 ("For "
                                                                     ++ (formatValueWithUnit value)
                                                                     ++ ": "
-                                                                    ++ (formatValueWithUnit (eval value scale))
+                                                                    ++ (formatValueWithUnit (calculate value scale))
                                                                 )
                                                             ]
                                                     )
@@ -374,6 +336,103 @@ view model =
                 model.timeChangingScales
             )
         ]
+
+
+viewArithmeticOperation : ArithmeticOperation -> Html msg
+viewArithmeticOperation op =
+    let
+        viewChildren s op1 op2 =
+            div []
+                [ text s
+                , ul []
+                    [ li [] [ viewArithmeticOperation op1 ]
+                    , li [] [ viewArithmeticOperation op2 ]
+                    ]
+                ]
+    in
+        case op of
+            OpenFisca.NoOp ->
+                text "NoOp"
+
+            Number n ->
+                text (toString n)
+
+            Add op1 op2 ->
+                viewChildren "Add" op1 op2
+
+            Negate op ->
+                div []
+                    [ text "Negate"
+                    , ul [] [ li [] [ viewArithmeticOperation op ] ]
+                    ]
+
+            Mul op1 op2 ->
+                viewChildren "Mul" op1 op2
+
+            Div op1 op2 ->
+                viewChildren "Div" op1 op2
+
+            Max op1 op2 ->
+                viewChildren "Max" op1 op2
+
+            Min op1 op2 ->
+                viewChildren "Min" op1 op2
+
+            Condition boolOp op1 op2 ->
+                div []
+                    [ text "Condition"
+                    , ul []
+                        [ li [] [ viewBooleanOperation boolOp ]
+                        , li [] [ viewArithmeticOperation op1 ]
+                        , li [] [ viewArithmeticOperation op2 ]
+                        ]
+                    ]
+
+            ScaleEvaluation scale op ->
+                div []
+                    [ text "ScaleEvaluation"
+                    , ul []
+                        [ viewScale scale
+                        , viewArithmeticOperation op
+                        ]
+                    ]
+
+
+viewBooleanOperation : BooleanOperation -> Html msg
+viewBooleanOperation op =
+    case op of
+        BOTrue ->
+            text "True"
+
+        BOFalse ->
+            text "False"
+
+        And op1 op2 ->
+            div []
+                [ text "And"
+                , ul []
+                    [ li [] [ viewBooleanOperation op1 ]
+                    , li [] [ viewBooleanOperation op2 ]
+                    ]
+                ]
+
+        Or op1 op2 ->
+            div []
+                [ text "Or"
+                , ul []
+                    [ li [] [ viewBooleanOperation op1 ]
+                    , li [] [ viewBooleanOperation op2 ]
+                    ]
+                ]
+
+        Equals op1 op2 ->
+            div []
+                [ text "Equals"
+                , ul []
+                    [ li [] [ viewArithmeticOperation op1 ]
+                    , li [] [ viewArithmeticOperation op2 ]
+                    ]
+                ]
 
 
 viewScale : Scale -> Html msg
