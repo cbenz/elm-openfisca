@@ -1,11 +1,14 @@
 module Main exposing (..)
 
-import Formulas exposing (..)
+import Senegal exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
+import Html.Events exposing (..)
+import Interpreter
 import Languages.French
 import Numeral
-import OpenFisca exposing (..)
+import Operations exposing (..)
+import String
 import Types exposing (..)
 
 
@@ -21,16 +24,6 @@ main =
 
 
 -- TYPES
-
-
-value : ValueWithUnit -> Float
-value valueWithUnit =
-    case valueWithUnit of
-        MonetaryAmount _ value ->
-            value
-
-        Amount value ->
-            value
 
 
 timeChangingScale :
@@ -50,13 +43,6 @@ timeChangingScale thresholdTagger brackets =
             , rates = rates
             }
         )
-        brackets
-
-
-scale : (number -> ValueWithUnit) -> List ( number, Rate ) -> Scale
-scale thresholdTagger brackets =
-    List.map
-        (\( threshold, rate ) -> ( thresholdTagger threshold, rate ))
         brackets
 
 
@@ -81,41 +67,6 @@ atDate date scale =
             scale
 
 
-calculate : ValueWithUnit -> Scale -> ValueWithUnit
-calculate valueWithUnit scale =
-    let
-        valueValue =
-            value valueWithUnit
-
-        matchingBrackets =
-            scale
-                |> List.reverse
-                |> List.filter (\( threshold, _ ) -> valueValue > (value threshold))
-    in
-        List.map2
-            (\( threshold, rate ) previousThreshold ->
-                let
-                    thresholdValue =
-                        value threshold
-                in
-                    case previousThreshold of
-                        Nothing ->
-                            (valueValue - thresholdValue) * rate
-
-                        Just previousThreshold ->
-                            ((value previousThreshold) - thresholdValue) * rate
-            )
-            matchingBrackets
-            (Nothing
-                :: (List.map (\( threshold, _ ) -> Just threshold)
-                        (List.take ((List.length matchingBrackets) - 1) matchingBrackets)
-                   )
-            )
-            |> List.sum
-            |> -- TODO Do not hardcode this.
-               MonetaryAmount "€"
-
-
 formatValueWithUnit : ValueWithUnit -> String
 formatValueWithUnit unit =
     case unit of
@@ -131,7 +82,7 @@ formatValueWithUnit unit =
 
 
 type alias Model =
-    { arithmeticOperation : ArithmeticOperation
+    { salaire : Float
     , scales : List Scale
     , timeChangingScales : List TimeChangingScale
     }
@@ -140,17 +91,6 @@ type alias Model =
 initialModel : Model
 initialModel =
     let
-        baremeImpotSenegal2013 =
-            scale
-                (MonetaryAmount "CFA")
-                [ ( 0, 0 )
-                , ( 630000, 0.2 )
-                , ( 1500000, 0.3 )
-                , ( 4000000, 0.35 )
-                , ( 8000000, 0.37 )
-                , ( 13500000, 0.4 )
-                ]
-
         baremeImpotFrance2014 =
             scale
                 (MonetaryAmount "€")
@@ -241,12 +181,11 @@ initialModel =
                 , ( 5, 0.45 )
                 ]
     in
-        { arithmeticOperation =
-            impotRevenus (Number 50000) baremeImpotSenegal2013 (Boolean False) (Boolean True) (Number 2)
+        { salaire = 50000
         , scales =
             [ baremeImpotFrance2014
             , baremeImpotFrance2015
-            , baremeImpotSenegal2013
+            , Senegal.baremeImpotProgressif2013
             , baremeReductionsPourChargeDeFamille
             ]
         , timeChangingScales =
@@ -265,14 +204,24 @@ init =
 
 
 type Msg
-    = NoOp
+    = SetSalaire String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        NoOp ->
-            ( model, Cmd.none )
+        SetSalaire str ->
+            ( { model
+                | salaire =
+                    case String.toFloat str of
+                        Ok float ->
+                            float
+
+                        Err _ ->
+                            model.salaire
+              }
+            , Cmd.none
+            )
 
 
 
@@ -288,7 +237,15 @@ subscriptions model =
 -- VIEW
 
 
-view : Model -> Html msg
+arithmeticOperation salaire =
+    impotRevenus
+        (Number salaire)
+        (Boolean False)
+        (Boolean True)
+        (Number 2)
+
+
+view : Model -> Html Msg
 view model =
     div [ style [ ( "margin", "1em" ) ] ]
         [ h1 [] [ text "elm-openfisca playground" ]
@@ -300,9 +257,24 @@ view model =
               in
                 a [ href url ] [ text url ]
             ]
+        , ul []
+            [ li []
+                [ input
+                    [ placeholder "Salaire"
+                    , onInput SetSalaire
+                    , type_ "number"
+                    , Html.Attributes.value (toString model.salaire)
+                    ]
+                    []
+                ]
+            , li []
+                [ text
+                    (toString (Interpreter.interpretArithmeticOperation (arithmeticOperation model.salaire)))
+                ]
+            ]
         , p
             []
-            [ viewArithmeticOperation model.arithmeticOperation ]
+            [ viewArithmeticOperation (arithmeticOperation model.salaire) ]
         , ul
             []
             (List.map
@@ -324,19 +296,19 @@ view model =
                                             timeChangingScale |> atDate date
                                      in
                                         [ viewScale scale ]
-                                            ++ (List.map
-                                                    (\value ->
-                                                        p []
-                                                            [ text
-                                                                ("For "
-                                                                    ++ (formatValueWithUnit value)
-                                                                    ++ ": "
-                                                                    ++ (formatValueWithUnit (calculate value scale))
-                                                                )
-                                                            ]
-                                                    )
-                                                    ([ 1000, 15000, 50000 ] |> List.map (MonetaryAmount "€"))
-                                               )
+                                     -- ++ (List.map
+                                     --         (\value ->
+                                     --             p []
+                                     --                 [ text
+                                     --                     ("For "
+                                     --                         ++ (formatValueWithUnit value)
+                                     --                         ++ ": "
+                                     --                         ++ (formatValueWithUnit (calculate value scale))
+                                     --                     )
+                                     --                 ]
+                                     --         )
+                                     --         ([ 1000, 15000, 50000 ] |> List.map (MonetaryAmount "€"))
+                                     --    )
                                     )
                             )
                             [ "2014-01-01", "2015-01-01" ]

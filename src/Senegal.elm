@@ -1,6 +1,6 @@
-module Formulas exposing (..)
+module Senegal exposing (..)
 
-import OpenFisca exposing (..)
+import Operations exposing (..)
 import Types exposing (..)
 
 
@@ -70,17 +70,29 @@ reductionImpotsPourChargeFamille impotProgressif estMarie conjointADesRevenus nb
             |> clip minimum maximum
 
 
+baremeImpotProgressif2013 : Scale
+baremeImpotProgressif2013 =
+    scale
+        (MonetaryAmount "CFA")
+        [ ( 0, 0 )
+        , ( 630000, 0.2 )
+        , ( 1500000, 0.3 )
+        , ( 4000000, 0.35 )
+        , ( 8000000, 0.37 )
+        , ( 13500000, 0.4 )
+        ]
+
+
 impotRevenus :
     ArithmeticOperation
-    -> Scale
     -> BooleanOperation
     -> BooleanOperation
     -> ArithmeticOperation
     -> ArithmeticOperation
-impotRevenus salaire baremeImpotProgressif estMarie conjointADesRevenus nbEnfants =
+impotRevenus salaire estMarie conjointADesRevenus nbEnfants =
     let
         impotProgressif =
-            ScaleEvaluation baremeImpotProgressif salaire
+            ScaleEvaluation baremeImpotProgressif2013 salaire
     in
         Add
             impotProgressif

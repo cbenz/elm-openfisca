@@ -1,4 +1,4 @@
-module OpenFisca exposing (..)
+module Operations exposing (..)
 
 import Types exposing (..)
 

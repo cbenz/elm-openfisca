@@ -31,3 +31,20 @@ type alias TimeChangingScale =
 type ValueWithUnit
     = MonetaryAmount Currency Float
     | Amount Float
+
+
+scale : (number -> ValueWithUnit) -> List ( number, Rate ) -> Scale
+scale thresholdTagger brackets =
+    List.map
+        (\( threshold, rate ) -> ( thresholdTagger threshold, rate ))
+        brackets
+
+
+value : ValueWithUnit -> Float
+value valueWithUnit =
+    case valueWithUnit of
+        MonetaryAmount _ value ->
+            value
+
+        Amount value ->
+            value
