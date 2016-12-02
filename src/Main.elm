@@ -237,6 +237,7 @@ subscriptions model =
 -- VIEW
 
 
+arithmeticOperation : Float -> ArithmeticOperation
 arithmeticOperation salaire =
     impotRevenus
         (Number salaire)
