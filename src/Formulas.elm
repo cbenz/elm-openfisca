@@ -30,46 +30,44 @@ reductionImpotsPourChargeFamille :
     -> ArithmeticOperation
 reductionImpotsPourChargeFamille impotProgressif estMarie conjointADesRevenus nbEnfants =
     let
-        taux =
-            Condition
-                (Equals (nbParts estMarie conjointADesRevenus nbEnfants) (Number 1))
-                (Number 0)
-                (Condition
-                    (Equals (nbParts estMarie conjointADesRevenus nbEnfants) (Number 1.5))
-                    (Number 0.15)
-                    (Number 999)
-                )
+        data =
+            [ ( 1, { taux = 0, minimum = 0, maximum = 0 } )
+            , ( 1.5, { taux = 0.1, minimum = 100000, maximum = 300000 } )
+            , ( 2, { taux = 0.15, minimum = 200000, maximum = 650000 } )
+            , ( 2.5, { taux = 0.2, minimum = 300000, maximum = 1100000 } )
+            , ( 3, { taux = 0.25, minimum = 400000, maximum = 1650000 } )
+            , ( 3.5, { taux = 0.3, minimum = 500000, maximum = 2030000 } )
+            , ( 4, { taux = 0.35, minimum = 600000, maximum = 2490000 } )
+            , ( 4.5, { taux = 0.4, minimum = 700000, maximum = 2755000 } )
+            , ( 5, { taux = 0.45, minimum = 800000, maximum = 3180000 } )
+            ]
 
-        -- (nbParts == 1.5) * taux_2 + \
-        -- (nbParts == 2) * taux_3 + \
-        -- (nbParts == 2.5) * taux_4 + \
-        -- (nbParts == 3) * taux_5 + \
-        -- (nbParts == 3.5) * taux_6 + \
-        -- (nbParts == 4) * taux_7 + \
-        -- (nbParts == 4.5) * taux_8 + \
-        -- (nbParts == 5) * taux_9
-        -- minimum = (nbParts == 1) * min_1 + \
-        --     (nbParts == 1.5) * min_2 + \
-        --     (nbParts == 2) * min_3 + \
-        --     (nbParts == 2.5) * min_4 + \
-        --     (nbParts == 3) * min_5 + \
-        --     (nbParts == 3.5) * min_6 + \
-        --     (nbParts == 4) * min_7 + \
-        --     (nbParts == 4.5) * min_8 + \
-        --     (nbParts == 5) * min_9
-        -- maximum = (nbParts == 1) * max_1 + \
-        --     (nbParts == 1.5) * max_2 + \
-        --     (nbParts == 2) * max_3 + \
-        --     (nbParts == 2.5) * max_4 + \
-        --     (nbParts == 3) * max_5 + \
-        --     (nbParts == 3.5) * max_6 + \
-        --     (nbParts == 4) * max_7 + \
-        --     (nbParts == 4.5) * max_8 + \
-        --     (nbParts == 5) * max_9
+        nbPartsValue =
+            nbParts estMarie conjointADesRevenus nbEnfants
+
+        valueHelp xs getter =
+            case xs of
+                [] ->
+                    Number 0
+
+                ( nbParts, values ) :: rest ->
+                    Condition
+                        (Equals nbPartsValue (Number nbParts))
+                        (Number (getter values))
+                        (valueHelp rest getter)
+
+        taux =
+            valueHelp data .taux
+
+        minimum =
+            valueHelp data .minimum
+
+        maximum =
+            valueHelp data .maximum
     in
-        -- |>clip  minimum maximum
         -- Mul (ScaleEvaluation baremeImpotProgressif salaire) taux
         Mul impotProgressif taux
+            |> clip minimum maximum
 
 
 impotRevenus :

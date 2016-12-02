@@ -4,8 +4,7 @@ import Types exposing (..)
 
 
 type ArithmeticOperation
-    = NoOp
-    | Number Float
+    = Number Float
     | Add ArithmeticOperation ArithmeticOperation
     | Negate ArithmeticOperation
     | Mul ArithmeticOperation ArithmeticOperation
@@ -17,8 +16,7 @@ type ArithmeticOperation
 
 
 type BooleanOperation
-    = BOTrue
-    | BOFalse
+    = Boolean Bool
     | And BooleanOperation BooleanOperation
     | Or BooleanOperation BooleanOperation
     | Equals ArithmeticOperation ArithmeticOperation
@@ -27,11 +25,6 @@ type BooleanOperation
 add3 : ArithmeticOperation -> ArithmeticOperation -> ArithmeticOperation -> ArithmeticOperation
 add3 op1 op2 op3 =
     Add op1 op2 |> Add op3
-
-
-addN : List ArithmeticOperation -> ArithmeticOperation
-addN ops =
-    List.foldl Add NoOp ops
 
 
 clip : ArithmeticOperation -> ArithmeticOperation -> ArithmeticOperation -> ArithmeticOperation

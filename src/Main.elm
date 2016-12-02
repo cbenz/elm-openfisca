@@ -242,8 +242,7 @@ initialModel =
                 ]
     in
         { arithmeticOperation =
-            impotRevenus (Number 50000) baremeImpotSenegal2013 (BOFalse) (BOTrue) (Number 2)
-            -- nbParts BOFalse BOFalse (Number 0)
+            impotRevenus (Number 50000) baremeImpotSenegal2013 (Boolean False) (Boolean True) (Number 2)
         , scales =
             [ baremeImpotFrance2014
             , baremeImpotFrance2015
@@ -361,9 +360,6 @@ viewArithmeticOperation op =
                 ]
     in
         case op of
-            OpenFisca.NoOp ->
-                text "NoOp"
-
             Number n ->
                 text (toString n)
 
@@ -392,9 +388,9 @@ viewArithmeticOperation op =
                 div []
                     [ text "Condition"
                     , ul []
-                        [ li [] [ viewBooleanOperation boolOp ]
-                        , li [] [ viewArithmeticOperation op1 ]
-                        , li [] [ viewArithmeticOperation op2 ]
+                        [ li [] [ text "(if) ", viewBooleanOperation boolOp ]
+                        , li [] [ text "(then) ", viewArithmeticOperation op1 ]
+                        , li [] [ text "(else) ", viewArithmeticOperation op2 ]
                         ]
                     ]
 
@@ -411,11 +407,8 @@ viewArithmeticOperation op =
 viewBooleanOperation : BooleanOperation -> Html msg
 viewBooleanOperation op =
     case op of
-        BOTrue ->
-            text "True"
-
-        BOFalse ->
-            text "False"
+        Boolean value ->
+            text (toString value)
 
         And op1 op2 ->
             div []
