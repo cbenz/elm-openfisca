@@ -1,82 +1,10 @@
 module Interpreter exposing (..)
 
-import Operations exposing (..)
 import Types exposing (..)
 
 
-interpretArithmeticOperation : ArithmeticOperation -> Result String Float
-interpretArithmeticOperation op =
-    case op of
-        Number float ->
-            Ok float
-
-        Add op1 op2 ->
-            Result.map2
-                (+)
-                (interpretArithmeticOperation op1)
-                (interpretArithmeticOperation op2)
-
-        Negate op ->
-            Result.map negate
-                (interpretArithmeticOperation op)
-
-        Mul op1 op2 ->
-            Result.map2
-                (*)
-                (interpretArithmeticOperation op1)
-                (interpretArithmeticOperation op2)
-
-        Div op1 op2 ->
-            Result.map2
-                (/)
-                (interpretArithmeticOperation op1)
-                (interpretArithmeticOperation op2)
-
-        Max op1 op2 ->
-            Result.map2
-                max
-                (interpretArithmeticOperation op1)
-                (interpretArithmeticOperation op2)
-
-        Min op1 op2 ->
-            Result.map2
-                min
-                (interpretArithmeticOperation op1)
-                (interpretArithmeticOperation op2)
-
-        Condition boolOp op1 op2 ->
-            -- Do not use map2 to defer evaluation in "then" or "else" branch.
-            if interpretBooleanOperation boolOp then
-                interpretArithmeticOperation op1
-            else
-                interpretArithmeticOperation op2
-
-        ScaleEvaluation scale op ->
-            Result.map (\v -> interpretScale v scale)
-                (interpretArithmeticOperation op)
-
-        ArithmeticError str op ->
-            Err (str ++ ": " ++ (toString (interpretArithmeticOperation op)))
-
-
-interpretBooleanOperation : BooleanOperation -> Bool
-interpretBooleanOperation op =
-    case op of
-        Boolean bool ->
-            bool
-
-        And op1 op2 ->
-            interpretBooleanOperation op1 && interpretBooleanOperation op2
-
-        Or op1 op2 ->
-            interpretBooleanOperation op1 || interpretBooleanOperation op2
-
-        Equals op1 op2 ->
-            interpretArithmeticOperation op1 == interpretArithmeticOperation op2
-
-
-interpretScale : Float -> Scale -> Float
-interpretScale value scale =
+interpretScale : Scale -> Float -> Float
+interpretScale scale value =
     let
         matchingBrackets =
             scale

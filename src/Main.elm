@@ -4,7 +4,7 @@ import Senegal exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Interpreter
+import Interpreter exposing (..)
 import Languages.French
 import Numeral
 import Operations exposing (..)
@@ -305,7 +305,7 @@ view model =
                         , type_ "number"
                         , Html.Attributes.value
                             (model.salaire
-                                |> Interpreter.interpretArithmeticOperation
+                                |> evalArithmeticOperation
                                 |> Result.withDefault 0
                                 |> toString
                             )
@@ -316,7 +316,7 @@ view model =
                 , br [] []
                 , label []
                     [ input
-                        [ checked (Interpreter.interpretBooleanOperation model.estMarie)
+                        [ checked (evalBooleanOperation model.estMarie)
                         , onCheck SetEstMarie
                         , type_ "checkbox"
                         ]
@@ -326,7 +326,7 @@ view model =
                 , br [] []
                 , label []
                     [ input
-                        [ checked (Interpreter.interpretBooleanOperation model.conjointADesRevenus)
+                        [ checked (evalBooleanOperation model.conjointADesRevenus)
                         , onCheck SetConjointADesRevenus
                         , type_ "checkbox"
                         ]
@@ -341,7 +341,7 @@ view model =
                         , type_ "number"
                         , Html.Attributes.value
                             (model.nbEnfants
-                                |> Interpreter.interpretArithmeticOperation
+                                |> evalArithmeticOperation
                                 |> Result.withDefault 0
                                 |> toString
                             )
@@ -353,7 +353,7 @@ view model =
                 [ text
                     ("nb parts = "
                         ++ (nbPartsOperation
-                                |> Interpreter.interpretArithmeticOperation
+                                |> evalArithmeticOperation
                                 |> toString
                            )
                     )
@@ -362,7 +362,7 @@ view model =
                 [ text
                     ("impôt progressif = "
                         ++ (impotProgressifOperation
-                                |> Interpreter.interpretArithmeticOperation
+                                |> evalArithmeticOperation
                                 |> toString
                            )
                     )
@@ -371,7 +371,7 @@ view model =
                 [ text
                     ("réductions pour charge de famille = "
                         ++ (reductionImpotsPourChargeFamille impotProgressifOperation nbPartsOperation
-                                |> Interpreter.interpretArithmeticOperation
+                                |> evalArithmeticOperation
                                 |> toString
                            )
                     )
@@ -380,7 +380,7 @@ view model =
                 [ text
                     ("impôt = "
                         ++ (impotRevenusOperation
-                                |> Interpreter.interpretArithmeticOperation
+                                |> evalArithmeticOperation
                                 |> toString
                            )
                     )
@@ -391,6 +391,7 @@ view model =
                 [ text "viewArithmeticOperation impotRevenusOperation"
                 , viewArithmeticOperation impotRevenusOperation
                 ]
+            , hr [] []
             , ul
                 []
                 (List.map
@@ -438,96 +439,101 @@ view model =
 viewArithmeticOperation : ArithmeticOperation -> Html msg
 viewArithmeticOperation op =
     let
-        viewChildren s op1 op2 =
+        viewChildren str ops =
             div []
-                [ text s
+                [ text str
                 , ul []
-                    [ li [] [ viewArithmeticOperation op1 ]
-                    , li [] [ viewArithmeticOperation op2 ]
-                    ]
+                    (List.map (\op -> li [] [ viewArithmeticOperation op ]) ops)
                 ]
     in
         case op of
             Number n ->
-                text (toString n)
+                div [] [ text ("Number " ++ (toString n)) ]
 
             Add op1 op2 ->
-                viewChildren "Add" op1 op2
+                viewChildren "Add" [ op1, op2 ]
 
             Negate op ->
-                div []
-                    [ text "Negate"
-                    , ul [] [ li [] [ viewArithmeticOperation op ] ]
-                    ]
+                viewChildren "Negate" [ op ]
 
             Mul op1 op2 ->
-                viewChildren "Mul" op1 op2
+                viewChildren "Mul" [ op1, op2 ]
 
             Div op1 op2 ->
-                viewChildren "Div" op1 op2
+                viewChildren "Div" [ op1, op2 ]
 
             Max op1 op2 ->
-                viewChildren "Max" op1 op2
+                viewChildren "Max" [ op1, op2 ]
 
             Min op1 op2 ->
-                viewChildren "Min" op1 op2
+                viewChildren "Min" [ op1, op2 ]
 
             Condition boolOp op1 op2 ->
                 div []
                     [ text "Condition"
-                    , ul []
-                        [ li [] [ text "(if) ", viewBooleanOperation boolOp ]
-                        , li [] [ text "(then) ", viewArithmeticOperation op1 ]
-                        , li [] [ text "(else) ", viewArithmeticOperation op2 ]
-                        ]
+                    , let
+                        condition =
+                            evalBooleanOperation boolOp
+                      in
+                        ul []
+                            [ li []
+                                [ text "if"
+                                , viewBooleanOperation boolOp
+                                ]
+                            , if condition then
+                                li []
+                                    [ text "then"
+                                    , viewArithmeticOperation op1
+                                    , text "else (hidden)"
+                                    ]
+                              else
+                                li []
+                                    [ text "then (hidden) else"
+                                    , viewArithmeticOperation op2
+                                    ]
+                            ]
                     ]
 
             ScaleEvaluation scale op ->
                 div []
-                    [ text "ScaleEvaluation"
-                    , ul []
-                        [ viewScale scale
-                        , viewArithmeticOperation op
-                        ]
+                    [ text "ScaleEvaluation "
+                    , evalArithmeticOperation op
+                        |> Result.map (interpretScale scale)
+                        |> toString
+                        |> text
                     ]
 
             ArithmeticError str op ->
                 div [ style [ ( "color", "red" ) ] ]
-                    [ text (str ++ ": " ++ (toString (Interpreter.interpretArithmeticOperation op))) ]
+                    [ text (str ++ ": " ++ (toString (evalArithmeticOperation op))) ]
 
 
 viewBooleanOperation : BooleanOperation -> Html msg
 viewBooleanOperation op =
-    case op of
-        Boolean value ->
-            text (toString value)
-
-        And op1 op2 ->
+    let
+        viewChildren str ops =
             div []
-                [ text "And"
+                [ text str
                 , ul []
-                    [ li [] [ viewBooleanOperation op1 ]
-                    , li [] [ viewBooleanOperation op2 ]
-                    ]
+                    (List.map (\op -> li [] [ viewBooleanOperation op ]) ops)
                 ]
+    in
+        case op of
+            Boolean value ->
+                div [] [ text ("Boolean " ++ (toString value)) ]
 
-        Or op1 op2 ->
-            div []
-                [ text "Or"
-                , ul []
-                    [ li [] [ viewBooleanOperation op1 ]
-                    , li [] [ viewBooleanOperation op2 ]
-                    ]
-                ]
+            And op1 op2 ->
+                viewChildren "And" [ op1, op2 ]
 
-        Equals op1 op2 ->
-            div []
-                [ text "Equals"
-                , ul []
-                    [ li [] [ viewArithmeticOperation op1 ]
-                    , li [] [ viewArithmeticOperation op2 ]
+            Or op1 op2 ->
+                viewChildren "Or" [ op1, op2 ]
+
+            Equals op1 op2 ->
+                div []
+                    [ text "Equals"
+                    , ul []
+                        (List.map (\op -> li [] [ viewArithmeticOperation op ]) [ op1, op2 ])
                     ]
-                ]
 
 
 viewScale : Scale -> Html msg
