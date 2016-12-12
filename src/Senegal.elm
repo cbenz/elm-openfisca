@@ -22,13 +22,8 @@ nbParts estMarie conjointADesRevenus nbEnfants =
             |> Min (Number 5)
 
 
-reductionImpotsPourChargeFamille :
-    ArithmeticOperation
-    -> BooleanOperation
-    -> BooleanOperation
-    -> ArithmeticOperation
-    -> ArithmeticOperation
-reductionImpotsPourChargeFamille impotProgressif estMarie conjointADesRevenus nbEnfants =
+reductionImpotsPourChargeFamille : ArithmeticOperation -> ArithmeticOperation -> ArithmeticOperation
+reductionImpotsPourChargeFamille impotProgressif nbParts =
     let
         data =
             [ ( 1, { taux = 0, minimum = 0, maximum = 0 } )
@@ -42,30 +37,26 @@ reductionImpotsPourChargeFamille impotProgressif estMarie conjointADesRevenus nb
             , ( 5, { taux = 0.45, minimum = 800000, maximum = 3180000 } )
             ]
 
-        nbPartsValue =
-            nbParts estMarie conjointADesRevenus nbEnfants
-
-        valueHelp xs getter =
+        findValue xs getter =
             case xs of
                 [] ->
-                    Number 0
+                    ArithmeticError "nbParts not found" nbParts
 
-                ( nbParts, values ) :: rest ->
+                ( nbParts2, values ) :: tail ->
                     Condition
-                        (Equals nbPartsValue (Number nbParts))
+                        (Equals nbParts (Number nbParts2))
                         (Number (getter values))
-                        (valueHelp rest getter)
+                        (findValue tail getter)
 
         taux =
-            valueHelp data .taux
+            findValue data .taux
 
         minimum =
-            valueHelp data .minimum
+            findValue data .minimum
 
         maximum =
-            valueHelp data .maximum
+            findValue data .maximum
     in
-        -- Mul (ScaleEvaluation baremeImpotProgressif salaire) taux
         Mul impotProgressif taux
             |> clip minimum maximum
 
@@ -93,10 +84,11 @@ impotRevenus salaire estMarie conjointADesRevenus nbEnfants =
     let
         impotProgressif =
             ScaleEvaluation baremeImpotProgressif2013 salaire
+
+        nbPartsValue =
+            nbParts estMarie conjointADesRevenus nbEnfants
     in
-        Add
+        substract
             impotProgressif
-            (Negate
-                (reductionImpotsPourChargeFamille impotProgressif estMarie conjointADesRevenus nbEnfants)
-            )
+            (reductionImpotsPourChargeFamille impotProgressif nbPartsValue)
             |> Max (Number 0)

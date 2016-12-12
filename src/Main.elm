@@ -82,7 +82,10 @@ formatValueWithUnit unit =
 
 
 type alias Model =
-    { salaire : Float
+    { conjointADesRevenus : BooleanOperation
+    , estMarie : BooleanOperation
+    , nbEnfants : ArithmeticOperation
+    , salaire : ArithmeticOperation
     , scales : List Scale
     , timeChangingScales : List TimeChangingScale
     }
@@ -181,7 +184,10 @@ initialModel =
                 , ( 5, 0.45 )
                 ]
     in
-        { salaire = 50000
+        { conjointADesRevenus = Boolean False
+        , estMarie = Boolean False
+        , nbEnfants = Number 0
+        , salaire = Number 630000
         , scales =
             [ baremeImpotFrance2014
             , baremeImpotFrance2015
@@ -204,24 +210,54 @@ init =
 
 
 type Msg
-    = SetSalaire String
+    = SetConjointADesRevenus Bool
+    | SetEstMarie Bool
+    | SetNbEnfants String
+    | SetSalaire String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        SetSalaire str ->
-            ( { model
-                | salaire =
-                    case String.toFloat str of
-                        Ok float ->
-                            float
-
-                        Err _ ->
-                            model.salaire
-              }
+        SetConjointADesRevenus bool ->
+            ( { model | conjointADesRevenus = Boolean bool }
             , Cmd.none
             )
+
+        SetEstMarie bool ->
+            ( { model | estMarie = Boolean bool }
+            , Cmd.none
+            )
+
+        SetNbEnfants str ->
+            let
+                newModel =
+                    if String.isEmpty str then
+                        { model | nbEnfants = Number 0 }
+                    else
+                        case String.toInt str of
+                            Ok int ->
+                                { model | nbEnfants = Number (toFloat int) }
+
+                            Err _ ->
+                                model
+            in
+                ( newModel, Cmd.none )
+
+        SetSalaire str ->
+            let
+                newModel =
+                    if String.isEmpty str then
+                        { model | salaire = Number 0 }
+                    else
+                        case String.toFloat str of
+                            Ok float ->
+                                { model | salaire = Number float }
+
+                            Err _ ->
+                                model
+            in
+                ( newModel, Cmd.none )
 
 
 
@@ -237,87 +273,166 @@ subscriptions model =
 -- VIEW
 
 
-arithmeticOperation : Float -> ArithmeticOperation
-arithmeticOperation salaire =
-    impotRevenus
-        (Number salaire)
-        (Boolean False)
-        (Boolean True)
-        (Number 2)
-
-
 view : Model -> Html Msg
 view model =
-    div [ style [ ( "margin", "1em" ) ] ]
-        [ h1 [] [ text "elm-openfisca playground" ]
-        , p []
-            [ text "Source code:"
-            , let
-                url =
-                    "https://github.com/cbenz/elm-openfisca"
-              in
-                a [ href url ] [ text url ]
-            ]
-        , ul []
-            [ li []
-                [ input
-                    [ placeholder "Salaire"
-                    , onInput SetSalaire
-                    , type_ "number"
-                    , Html.Attributes.value (toString model.salaire)
-                    ]
-                    []
+    let
+        impotRevenusOperation =
+            impotRevenus model.salaire model.estMarie model.conjointADesRevenus model.nbEnfants
+
+        impotProgressifOperation =
+            ScaleEvaluation baremeImpotProgressif2013 model.salaire
+
+        nbPartsOperation =
+            nbParts model.estMarie model.conjointADesRevenus model.nbEnfants
+    in
+        div [ style [ ( "margin", "1em" ) ] ]
+            [ h1 [] [ text "elm-openfisca playground" ]
+            , p []
+                [ text "Source code:"
+                , let
+                    url =
+                        "https://github.com/cbenz/elm-openfisca"
+                  in
+                    a [ href url ] [ text url ]
                 ]
-            , li []
-                [ text
-                    (toString (Interpreter.interpretArithmeticOperation (arithmeticOperation model.salaire)))
-                ]
-            ]
-        , p
-            []
-            [ viewArithmeticOperation (arithmeticOperation model.salaire) ]
-        , ul
-            []
-            (List.map
-                (\scale ->
-                    li []
-                        [ viewScale scale ]
-                )
-                model.scales
-            )
-        , ul []
-            (List.map
-                (\timeChangingScale ->
-                    ul []
-                        (List.map
-                            (\date ->
-                                li []
-                                    (let
-                                        scale =
-                                            timeChangingScale |> atDate date
-                                     in
-                                        [ viewScale scale ]
-                                     -- ++ (List.map
-                                     --         (\value ->
-                                     --             p []
-                                     --                 [ text
-                                     --                     ("For "
-                                     --                         ++ (formatValueWithUnit value)
-                                     --                         ++ ": "
-                                     --                         ++ (formatValueWithUnit (calculate value scale))
-                                     --                     )
-                                     --                 ]
-                                     --         )
-                                     --         ([ 1000, 15000, 50000 ] |> List.map (MonetaryAmount "€"))
-                                     --    )
-                                    )
+            , hr [] []
+            , Html.form []
+                [ label []
+                    [ text "Salaire annuel "
+                    , input
+                        [ onInput SetSalaire
+                        , step "1000"
+                        , type_ "number"
+                        , Html.Attributes.value
+                            (model.salaire
+                                |> Interpreter.interpretArithmeticOperation
+                                |> Result.withDefault 0
+                                |> toString
                             )
-                            [ "2014-01-01", "2015-01-01" ]
-                        )
+                        ]
+                        []
+                    , text " francs CFA"
+                    ]
+                , br [] []
+                , label []
+                    [ input
+                        [ checked (Interpreter.interpretBooleanOperation model.estMarie)
+                        , onCheck SetEstMarie
+                        , type_ "checkbox"
+                        ]
+                        []
+                    , text "est marié"
+                    ]
+                , br [] []
+                , label []
+                    [ input
+                        [ checked (Interpreter.interpretBooleanOperation model.conjointADesRevenus)
+                        , onCheck SetConjointADesRevenus
+                        , type_ "checkbox"
+                        ]
+                        []
+                    , text "conjoint a des revenus"
+                    ]
+                , br [] []
+                , label []
+                    [ text "Nb enfants "
+                    , input
+                        [ onInput SetNbEnfants
+                        , type_ "number"
+                        , Html.Attributes.value
+                            (model.nbEnfants
+                                |> Interpreter.interpretArithmeticOperation
+                                |> Result.withDefault 0
+                                |> toString
+                            )
+                        ]
+                        []
+                    ]
+                ]
+            , p []
+                [ text
+                    ("nb parts = "
+                        ++ (nbPartsOperation
+                                |> Interpreter.interpretArithmeticOperation
+                                |> toString
+                           )
+                    )
+                ]
+            , p []
+                [ text
+                    ("impôt progressif = "
+                        ++ (impotProgressifOperation
+                                |> Interpreter.interpretArithmeticOperation
+                                |> toString
+                           )
+                    )
+                ]
+            , p []
+                [ text
+                    ("réductions pour charge de famille = "
+                        ++ (reductionImpotsPourChargeFamille impotProgressifOperation nbPartsOperation
+                                |> Interpreter.interpretArithmeticOperation
+                                |> toString
+                           )
+                    )
+                ]
+            , p []
+                [ text
+                    ("impôt = "
+                        ++ (impotRevenusOperation
+                                |> Interpreter.interpretArithmeticOperation
+                                |> toString
+                           )
+                    )
+                ]
+            , hr [] []
+            , p
+                []
+                [ text "viewArithmeticOperation impotRevenusOperation"
+                , viewArithmeticOperation impotRevenusOperation
+                ]
+            , ul
+                []
+                (List.map
+                    (\scale ->
+                        li []
+                            [ viewScale scale ]
+                    )
+                    model.scales
                 )
-                model.timeChangingScales
-            )
-        ]
+            , ul []
+                (List.map
+                    (\timeChangingScale ->
+                        ul []
+                            (List.map
+                                (\date ->
+                                    li []
+                                        (let
+                                            scale =
+                                                timeChangingScale |> atDate date
+                                         in
+                                            [ viewScale scale ]
+                                         -- ++ (List.map
+                                         --         (\value ->
+                                         --             p []
+                                         --                 [ text
+                                         --                     ("For "
+                                         --                         ++ (formatValueWithUnit value)
+                                         --                         ++ ": "
+                                         --                         ++ (formatValueWithUnit (calculate value scale))
+                                         --                     )
+                                         --                 ]
+                                         --         )
+                                         --         ([ 1000, 15000, 50000 ] |> List.map (MonetaryAmount "€"))
+                                         --    )
+                                        )
+                                )
+                                [ "2014-01-01", "2015-01-01" ]
+                            )
+                    )
+                    model.timeChangingScales
+                )
+            ]
 
 
 viewArithmeticOperation : ArithmeticOperation -> Html msg
@@ -375,6 +490,10 @@ viewArithmeticOperation op =
                         , viewArithmeticOperation op
                         ]
                     ]
+
+            ArithmeticError str op ->
+                div [ style [ ( "color", "red" ) ] ]
+                    [ text (str ++ ": " ++ (toString (Interpreter.interpretArithmeticOperation op))) ]
 
 
 viewBooleanOperation : BooleanOperation -> Html msg

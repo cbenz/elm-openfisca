@@ -4,58 +4,59 @@ import Operations exposing (..)
 import Types exposing (..)
 
 
-interpretArithmeticOperation : ArithmeticOperation -> Float
+interpretArithmeticOperation : ArithmeticOperation -> Result String Float
 interpretArithmeticOperation op =
     case op of
         Number float ->
-            float
+            Ok float
 
         Add op1 op2 ->
-            (interpretArithmeticOperation op1) + (interpretArithmeticOperation op2)
+            Result.map2
+                (+)
+                (interpretArithmeticOperation op1)
+                (interpretArithmeticOperation op2)
 
         Negate op ->
-            -(interpretArithmeticOperation op)
+            Result.map negate
+                (interpretArithmeticOperation op)
 
         Mul op1 op2 ->
-            (interpretArithmeticOperation op1) * (interpretArithmeticOperation op2)
+            Result.map2
+                (*)
+                (interpretArithmeticOperation op1)
+                (interpretArithmeticOperation op2)
 
         Div op1 op2 ->
-            (interpretArithmeticOperation op1) / (interpretArithmeticOperation op2)
+            Result.map2
+                (/)
+                (interpretArithmeticOperation op1)
+                (interpretArithmeticOperation op2)
 
         Max op1 op2 ->
-            let
-                v1 =
-                    interpretArithmeticOperation op1
-
-                v2 =
-                    interpretArithmeticOperation op2
-            in
-                if v1 < v2 then
-                    v2
-                else
-                    v1
+            Result.map2
+                max
+                (interpretArithmeticOperation op1)
+                (interpretArithmeticOperation op2)
 
         Min op1 op2 ->
-            let
-                v1 =
-                    interpretArithmeticOperation op1
-
-                v2 =
-                    interpretArithmeticOperation op2
-            in
-                if v1 < v2 then
-                    v1
-                else
-                    v2
+            Result.map2
+                min
+                (interpretArithmeticOperation op1)
+                (interpretArithmeticOperation op2)
 
         Condition boolOp op1 op2 ->
+            -- Do not use map2 to defer evaluation in "then" or "else" branch.
             if interpretBooleanOperation boolOp then
                 interpretArithmeticOperation op1
             else
                 interpretArithmeticOperation op2
 
         ScaleEvaluation scale op ->
-            interpretScale (interpretArithmeticOperation op) scale
+            Result.map (\v -> interpretScale v scale)
+                (interpretArithmeticOperation op)
+
+        ArithmeticError str op ->
+            Err (str ++ ": " ++ (toString (interpretArithmeticOperation op)))
 
 
 interpretBooleanOperation : BooleanOperation -> Bool

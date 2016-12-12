@@ -5,6 +5,7 @@ import Types exposing (..)
 
 type ArithmeticOperation
     = Number Float
+      -- Distinguish counts from amounts? Use ValueWithUnit?
     | Add ArithmeticOperation ArithmeticOperation
     | Negate ArithmeticOperation
     | Mul ArithmeticOperation ArithmeticOperation
@@ -13,6 +14,7 @@ type ArithmeticOperation
     | Min ArithmeticOperation ArithmeticOperation
     | Condition BooleanOperation ArithmeticOperation ArithmeticOperation
     | ScaleEvaluation Scale ArithmeticOperation
+    | ArithmeticError String ArithmeticOperation
 
 
 type BooleanOperation
@@ -30,3 +32,8 @@ add3 op1 op2 op3 =
 clip : ArithmeticOperation -> ArithmeticOperation -> ArithmeticOperation -> ArithmeticOperation
 clip min max op =
     Max min (Min max op)
+
+
+substract : ArithmeticOperation -> ArithmeticOperation -> ArithmeticOperation
+substract op1 op2 =
+    Add op1 (Negate op2)
