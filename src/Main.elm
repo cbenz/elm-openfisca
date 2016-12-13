@@ -469,7 +469,7 @@ viewPlot funcs =
                 )
                 salaires
     in
-        plot []
+        plot [ plotStyle [ ( "padding", "0 0 2em 5em" ) ] ]
             ([ xAxis []
              , yAxis []
              ]
