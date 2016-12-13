@@ -125,101 +125,104 @@ evalBooleanOperation op =
 -- VIEW
 
 
-viewArithmeticOperation : ArithmeticOperation -> Html msg
-viewArithmeticOperation op =
+viewArithmeticOperation : List (Html.Attribute msg) -> ArithmeticOperation -> Html msg
+viewArithmeticOperation attrs op =
     let
         viewChildren str ops =
-            div []
-                [ text str
-                , ul []
-                    (List.map (\op -> li [] [ viewArithmeticOperation op ]) ops)
-                ]
+            text str :: List.map (viewArithmeticOperation []) ops
     in
-        case op of
-            Number n ->
-                div [] [ text ("Number " ++ (toString n)) ]
+        ul attrs
+            [ li []
+                (case op of
+                    Number n ->
+                        [ text ("Number " ++ (toString n)) ]
 
-            Add op1 op2 ->
-                viewChildren "Add" [ op1, op2 ]
+                    Add op1 op2 ->
+                        viewChildren "Add" [ op1, op2 ]
 
-            Negate op ->
-                viewChildren "Negate" [ op ]
+                    Negate op ->
+                        viewChildren "Negate" [ op ]
 
-            Mul op1 op2 ->
-                viewChildren "Mul" [ op1, op2 ]
+                    Mul op1 op2 ->
+                        viewChildren "Mul" [ op1, op2 ]
 
-            Div op1 op2 ->
-                viewChildren "Div" [ op1, op2 ]
+                    Div op1 op2 ->
+                        viewChildren "Div" [ op1, op2 ]
 
-            Max op1 op2 ->
-                viewChildren "Max" [ op1, op2 ]
+                    Max op1 op2 ->
+                        viewChildren "Max" [ op1, op2 ]
 
-            Min op1 op2 ->
-                viewChildren "Min" [ op1, op2 ]
+                    Min op1 op2 ->
+                        viewChildren "Min" [ op1, op2 ]
 
-            Condition boolOp op1 op2 ->
-                div []
-                    [ text "Condition"
-                    , let
-                        condition =
-                            evalBooleanOperation boolOp
-                      in
-                        ul []
-                            [ li []
-                                [ text "if"
-                                , viewBooleanOperation boolOp
+                    Condition boolOp op1 op2 ->
+                        let
+                            condition =
+                                evalBooleanOperation boolOp
+                        in
+                            [ text "Condition"
+                            , br [] []
+                            , text "if"
+                            , viewBooleanOperation [] boolOp
+                            , text "then"
+                            , viewArithmeticOperation
+                                [ style
+                                    (if condition then
+                                        [ ( "color", "lightgray" ) ]
+                                     else
+                                        []
+                                    )
                                 ]
-                            , if condition then
-                                li []
-                                    [ text "then"
-                                    , viewArithmeticOperation op1
-                                    , text "else (hidden)"
-                                    ]
-                              else
-                                li []
-                                    [ text "then (hidden) else"
-                                    , viewArithmeticOperation op2
-                                    ]
+                                op1
+                            , text "else"
+                            , viewArithmeticOperation
+                                [ style
+                                    (if condition then
+                                        []
+                                     else
+                                        [ ( "color", "lightgray" ) ]
+                                    )
+                                ]
+                                op2
                             ]
-                    ]
 
-            ScaleEvaluation scale op ->
-                div []
-                    [ text "ScaleEvaluation "
-                    , evalArithmeticOperation op
-                        |> Result.map (interpretScale scale)
-                        |> toString
-                        |> text
-                    ]
+                    ScaleEvaluation scale op ->
+                        [ text "ScaleEvaluation"
+                        , br [] []
+                        , text
+                            (evalArithmeticOperation op
+                                |> Result.map (interpretScale scale)
+                                |> toString
+                            )
+                        ]
 
-            ArithmeticError str op ->
-                div [ style [ ( "color", "red" ) ] ]
-                    [ text (str ++ ": " ++ (toString (evalArithmeticOperation op))) ]
+                    ArithmeticError str op ->
+                        [ div [ style [ ( "color", "red" ) ] ]
+                            [ text (str ++ ": " ++ (toString (evalArithmeticOperation op))) ]
+                        ]
+                )
+            ]
 
 
-viewBooleanOperation : BooleanOperation -> Html msg
-viewBooleanOperation op =
+viewBooleanOperation : List (Html.Attribute msg) -> BooleanOperation -> Html msg
+viewBooleanOperation attrs op =
     let
         viewChildren str ops =
-            div []
-                [ text str
-                , ul []
-                    (List.map (\op -> li [] [ viewBooleanOperation op ]) ops)
-                ]
+            text str :: List.map (viewBooleanOperation []) ops
     in
-        case op of
-            Boolean value ->
-                div [] [ text ("Boolean " ++ (toString value)) ]
+        ul attrs
+            [ li []
+                (case op of
+                    Boolean value ->
+                        [ text ("Boolean " ++ (toString value)) ]
 
-            And op1 op2 ->
-                viewChildren "And" [ op1, op2 ]
+                    And op1 op2 ->
+                        viewChildren "And" [ op1, op2 ]
 
-            Or op1 op2 ->
-                viewChildren "Or" [ op1, op2 ]
+                    Or op1 op2 ->
+                        viewChildren "Or" [ op1, op2 ]
 
-            Equals op1 op2 ->
-                div []
-                    [ text "Equals"
-                    , ul []
-                        (List.map (\op -> li [] [ viewArithmeticOperation op ]) [ op1, op2 ])
-                    ]
+                    Equals op1 op2 ->
+                        text "Equals" :: List.map (viewArithmeticOperation []) [ op1, op2 ]
+                )
+            ]

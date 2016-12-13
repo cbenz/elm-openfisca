@@ -405,7 +405,7 @@ view model =
             , p
                 []
                 [ text "viewArithmeticOperation impotRevenusOperation"
-                , viewArithmeticOperation impotRevenusOperation
+                , viewArithmeticOperation [] impotRevenusOperation
                 ]
             , hr [] []
             , ul
