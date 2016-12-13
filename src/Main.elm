@@ -4,10 +4,11 @@ import Senegal exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Interpreter exposing (..)
 import Languages.French
 import Numeral
+import Numeric
 import Operations exposing (..)
+import Plot exposing (..)
 import String
 import Types exposing (..)
 
@@ -277,7 +278,7 @@ view : Model -> Html Msg
 view model =
     let
         impotRevenusOperation =
-            impotRevenus model.salaire model.estMarie model.conjointADesRevenus model.nbEnfants
+            impotRevenus model.estMarie model.conjointADesRevenus model.nbEnfants model.salaire
 
         impotProgressifOperation =
             ScaleEvaluation baremeImpotProgressif2013 model.salaire
@@ -386,6 +387,19 @@ view model =
                     )
                 ]
             , hr [] []
+            , div []
+                [ h2 [] [ text "Plot" ]
+                , viewPlot
+                    [ ScaleEvaluation baremeImpotProgressif2013
+                    , impotRevenus model.estMarie model.conjointADesRevenus model.nbEnfants
+                    , (\salaire ->
+                        reductionImpotsPourChargeFamille
+                            (ScaleEvaluation baremeImpotProgressif2013 salaire)
+                            nbPartsOperation
+                      )
+                    ]
+                ]
+            , hr [] []
             , p
                 []
                 [ text "viewArithmeticOperation impotRevenusOperation"
@@ -436,104 +450,35 @@ view model =
             ]
 
 
-viewArithmeticOperation : ArithmeticOperation -> Html msg
-viewArithmeticOperation op =
+viewPlot : List (ArithmeticOperation -> ArithmeticOperation) -> Html msg
+viewPlot funcs =
     let
-        viewChildren str ops =
-            div []
-                [ text str
-                , ul []
-                    (List.map (\op -> li [] [ viewArithmeticOperation op ]) ops)
-                ]
+        salaires =
+            Numeric.linspace 0 16000000 100
+
+        points func =
+            List.map
+                (\salaire ->
+                    ( salaire
+                    , func (Number salaire)
+                        |> evalArithmeticOperation
+                        |> Result.withDefault 0
+                    )
+                )
+                salaires
     in
-        case op of
-            Number n ->
-                div [] [ text ("Number " ++ (toString n)) ]
-
-            Add op1 op2 ->
-                viewChildren "Add" [ op1, op2 ]
-
-            Negate op ->
-                viewChildren "Negate" [ op ]
-
-            Mul op1 op2 ->
-                viewChildren "Mul" [ op1, op2 ]
-
-            Div op1 op2 ->
-                viewChildren "Div" [ op1, op2 ]
-
-            Max op1 op2 ->
-                viewChildren "Max" [ op1, op2 ]
-
-            Min op1 op2 ->
-                viewChildren "Min" [ op1, op2 ]
-
-            Condition boolOp op1 op2 ->
-                div []
-                    [ text "Condition"
-                    , let
-                        condition =
-                            evalBooleanOperation boolOp
-                      in
-                        ul []
-                            [ li []
-                                [ text "if"
-                                , viewBooleanOperation boolOp
-                                ]
-                            , if condition then
-                                li []
-                                    [ text "then"
-                                    , viewArithmeticOperation op1
-                                    , text "else (hidden)"
-                                    ]
-                              else
-                                li []
-                                    [ text "then (hidden) else"
-                                    , viewArithmeticOperation op2
-                                    ]
-                            ]
-                    ]
-
-            ScaleEvaluation scale op ->
-                div []
-                    [ text "ScaleEvaluation "
-                    , evalArithmeticOperation op
-                        |> Result.map (interpretScale scale)
-                        |> toString
-                        |> text
-                    ]
-
-            ArithmeticError str op ->
-                div [ style [ ( "color", "red" ) ] ]
-                    [ text (str ++ ": " ++ (toString (evalArithmeticOperation op))) ]
-
-
-viewBooleanOperation : BooleanOperation -> Html msg
-viewBooleanOperation op =
-    let
-        viewChildren str ops =
-            div []
-                [ text str
-                , ul []
-                    (List.map (\op -> li [] [ viewBooleanOperation op ]) ops)
-                ]
-    in
-        case op of
-            Boolean value ->
-                div [] [ text ("Boolean " ++ (toString value)) ]
-
-            And op1 op2 ->
-                viewChildren "And" [ op1, op2 ]
-
-            Or op1 op2 ->
-                viewChildren "Or" [ op1, op2 ]
-
-            Equals op1 op2 ->
-                div []
-                    [ text "Equals"
-                    , ul []
-                        (List.map (\op -> li [] [ viewArithmeticOperation op ]) [ op1, op2 ])
-                    ]
+        plot []
+            ([ xAxis []
+             , yAxis []
+             ]
+                ++ (List.map
+                        (\func ->
+                            line [ lineStyle [ ( "fill", "none" ) ] ]
+                                (points func)
+                        )
+                        funcs
+                   )
+            )
 
 
 viewScale : Scale -> Html msg

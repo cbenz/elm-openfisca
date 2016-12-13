@@ -75,12 +75,12 @@ baremeImpotProgressif2013 =
 
 
 impotRevenus :
-    ArithmeticOperation
-    -> BooleanOperation
+    BooleanOperation
     -> BooleanOperation
     -> ArithmeticOperation
     -> ArithmeticOperation
-impotRevenus salaire estMarie conjointADesRevenus nbEnfants =
+    -> ArithmeticOperation
+impotRevenus estMarie conjointADesRevenus nbEnfants salaire =
     let
         impotProgressif =
             ScaleEvaluation baremeImpotProgressif2013 salaire
