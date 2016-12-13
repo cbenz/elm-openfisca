@@ -301,7 +301,8 @@ view model =
                 [ label []
                     [ text "Salaire annuel "
                     , input
-                        [ onInput SetSalaire
+                        [ Html.Attributes.min "0"
+                        , onInput SetSalaire
                         , step "1000"
                         , type_ "number"
                         , Html.Attributes.value
@@ -338,7 +339,8 @@ view model =
                 , label []
                     [ text "Nb enfants "
                     , input
-                        [ onInput SetNbEnfants
+                        [ Html.Attributes.min "0"
+                        , onInput SetNbEnfants
                         , type_ "number"
                         , Html.Attributes.value
                             (model.nbEnfants
