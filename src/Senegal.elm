@@ -62,6 +62,50 @@ reductionImpotsPourChargeFamille impotProgressif nbParts =
             |> clip minimum maximum
 
 
+baremeImpotProgressif : ScaleWithDate
+baremeImpotProgressif =
+    let
+        start =
+            "2013-01-01"
+
+        stop =
+            "2013-12-31"
+    in
+        scaleWithDate
+            (MonetaryAmount "CFA")
+            [ { thresholds =
+                    [ ( start, stop, 0 ) ]
+              , rates =
+                    [ ( start, stop, 0 ) ]
+              }
+            , { thresholds =
+                    [ ( start, stop, 630000 ) ]
+              , rates =
+                    [ ( start, stop, 0.2 ) ]
+              }
+            , { thresholds =
+                    [ ( start, stop, 1500000 ) ]
+              , rates =
+                    [ ( start, stop, 0.3 ) ]
+              }
+            , { thresholds =
+                    [ ( start, stop, 4000000 ) ]
+              , rates =
+                    [ ( start, stop, 0.35 ) ]
+              }
+            , { thresholds =
+                    [ ( start, stop, 8000000 ) ]
+              , rates =
+                    [ ( start, stop, 0.37 ) ]
+              }
+            , { thresholds =
+                    [ ( start, stop, 13500000 ) ]
+              , rates =
+                    [ ( start, stop, 0.4 ) ]
+              }
+            ]
+
+
 baremeImpotProgressif2013 : Scale
 baremeImpotProgressif2013 =
     scale
@@ -84,7 +128,7 @@ impotRevenus :
 impotRevenus estMarie conjointADesRevenus nbEnfants salaire =
     let
         impotProgressif =
-            ScaleEvaluation baremeImpotProgressif2013 salaire
+            ScaleEvaluation baremeImpotProgressif "2013-01-01" salaire
 
         nbPartsValue =
             nbParts estMarie conjointADesRevenus nbEnfants

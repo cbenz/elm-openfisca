@@ -121,7 +121,7 @@ view model =
             Senegal.impotRevenus model.estMarie model.conjointADesRevenus model.nbEnfants model.salaire
 
         impotProgressifOperation =
-            ScaleEvaluation Senegal.baremeImpotProgressif2013 model.salaire
+            ScaleEvaluation Senegal.baremeImpotProgressif "2013-01-01" model.salaire
 
         nbPartsOperation =
             Senegal.nbParts model.estMarie model.conjointADesRevenus model.nbEnfants
@@ -232,11 +232,11 @@ view model =
             , div []
                 [ h2 [] [ text "Variation of salary on X axis" ]
                 , viewPlot
-                    [ ( ScaleEvaluation Senegal.baremeImpotProgressif2013, "blue" )
+                    [ ( ScaleEvaluation Senegal.baremeImpotProgressif "2013-01-01", "blue" )
                     , ( Senegal.impotRevenus model.estMarie model.conjointADesRevenus model.nbEnfants, "red" )
                     , ( (\salaire ->
                             Senegal.reductionImpotsPourChargeFamille
-                                (ScaleEvaluation Senegal.baremeImpotProgressif2013 salaire)
+                                (ScaleEvaluation Senegal.baremeImpotProgressif "2013-01-01" salaire)
                                 nbPartsOperation
                         )
                       , "green"
@@ -261,14 +261,14 @@ view model =
               --     )
               -- , ul []
               --     (List.map
-              --         (\timeChangingScale ->
+              --         (\scaleWithDate ->
               --             ul []
               --                 (List.map
               --                     (\date ->
               --                         li []
               --                             (let
               --                                 scale =
-              --                                     timeChangingScale |> Scale.atDate date
+              --                                     scaleWithDate |> Scale.atDate date
               --                              in
               --                                 [ Scale.view scale ]
               --                             )

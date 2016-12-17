@@ -5,6 +5,12 @@ import Html.Attributes exposing (..)
 import Value exposing (Value(..))
 
 
+type alias Bracket =
+    { thresholds : List ( Date, Date, Float )
+    , rates : List ( Date, Date, Rate )
+    }
+
+
 type alias Date =
     String
 
@@ -17,7 +23,7 @@ type alias Scale =
     List ( Value, Rate )
 
 
-type alias TimeChangingScale =
+type alias ScaleWithDate =
     List
         { thresholds : List ( Date, Date, Value )
         , rates : List ( Date, Date, Rate )
@@ -35,14 +41,22 @@ scale thresholdTagger brackets =
         brackets
 
 
-timeChangingScale :
-    (number -> Value)
-    -> List
-        { thresholds : List ( Date, Date, number )
-        , rates : List ( Date, Date, Rate )
-        }
-    -> TimeChangingScale
-timeChangingScale thresholdTagger brackets =
+{-| Build a `ScaleWithDate` from a `List Bracket`.
+
+Example:
+    scaleWithDate
+        (MonetaryAmount "€")
+        [ { thresholds =
+                [ ( "2014-01-01", "2015-12-31", 0 )
+                ]
+          , rates =
+                [ ( "2014-01-01", "2015-12-31", 0 )
+                ]
+          }
+        ]
+-}
+scaleWithDate : (Float -> Value) -> List Bracket -> ScaleWithDate
+scaleWithDate thresholdTagger brackets =
     List.map
         (\{ thresholds, rates } ->
             { thresholds =
@@ -89,7 +103,7 @@ compute inputValue scale =
             |> List.sum
 
 
-atDate : Date -> TimeChangingScale -> Scale
+atDate : Date -> ScaleWithDate -> Scale
 atDate date scale =
     let
         findForDate xs =

@@ -28,7 +28,7 @@ baremeImpotFrance2015 =
 
 
 baremeImpotFrance =
-    timeChangingScale
+    scaleWithDate
         (MonetaryAmount "€")
         [ { thresholds =
                 [ ( "2014-01-01", "2015-12-31", 0 )
@@ -108,4 +108,5 @@ scales =
 
 timeChangingScales =
     [ baremeImpotFrance
+    , Senegal.baremeImpotProgressif
     ]

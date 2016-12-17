@@ -15,7 +15,7 @@ type ArithmeticOperation
     | Max ArithmeticOperation ArithmeticOperation
     | Min ArithmeticOperation ArithmeticOperation
     | Condition BooleanOperation ArithmeticOperation ArithmeticOperation
-    | ScaleEvaluation Scale ArithmeticOperation
+    | ScaleEvaluation ScaleWithDate Date ArithmeticOperation
     | ArithmeticError String ArithmeticOperation
 
 
@@ -96,9 +96,13 @@ evalArithmeticOperation op =
             else
                 evalArithmeticOperation op2
 
-        ScaleEvaluation scale op ->
-            Result.map (\x -> Scale.compute x scale)
-                (evalArithmeticOperation op)
+        ScaleEvaluation scaleWithDate date op ->
+            let
+                scale =
+                    atDate date scaleWithDate
+            in
+                Result.map (\x -> Scale.compute x scale)
+                    (evalArithmeticOperation op)
 
         ArithmeticError str op ->
             Err (str ++ ": " ++ (toString (evalArithmeticOperation op)))
@@ -185,13 +189,17 @@ viewArithmeticOperation attrs op =
                                 op2
                             ]
 
-                    ScaleEvaluation scale op ->
+                    ScaleEvaluation scaleWithDate date op ->
                         let
+                            scale =
+                                atDate date scaleWithDate
+
                             n =
                                 evalArithmeticOperation op
                         in
                             [ text "ScaleEvaluation"
                             , br [] []
+                            , text ("at date = " ++ date)
                             , Scale.view scale
                             , text ("input = " ++ (toString n))
                             , br [] []
