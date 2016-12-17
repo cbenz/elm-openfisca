@@ -2,13 +2,12 @@ module Operations exposing (..)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Interpreter exposing (..)
-import Types exposing (..)
+import Scale exposing (..)
 
 
 type ArithmeticOperation
     = Number Float
-      -- Distinguish counts from amounts? Use ValueWithUnit?
+      -- Distinguish counts from amounts? Use Value?
     | Add ArithmeticOperation ArithmeticOperation
     | Negate ArithmeticOperation
     | Mul ArithmeticOperation ArithmeticOperation
@@ -28,7 +27,7 @@ type BooleanOperation
 
 
 
--- CONSTRUCTION
+-- BUILD VALUES
 
 
 add3 : ArithmeticOperation -> ArithmeticOperation -> ArithmeticOperation -> ArithmeticOperation
@@ -98,7 +97,7 @@ evalArithmeticOperation op =
                 evalArithmeticOperation op2
 
         ScaleEvaluation scale op ->
-            Result.map (interpretScale scale)
+            Result.map (\x -> Scale.compute x scale)
                 (evalArithmeticOperation op)
 
         ArithmeticError str op ->
@@ -187,14 +186,23 @@ viewArithmeticOperation attrs op =
                             ]
 
                     ScaleEvaluation scale op ->
-                        [ text "ScaleEvaluation"
-                        , br [] []
-                        , text
-                            (evalArithmeticOperation op
-                                |> Result.map (interpretScale scale)
-                                |> toString
-                            )
-                        ]
+                        let
+                            n =
+                                evalArithmeticOperation op
+                        in
+                            [ text "ScaleEvaluation"
+                            , br [] []
+                            , Scale.view scale
+                            , text ("input = " ++ (toString n))
+                            , br [] []
+                            , text
+                                ("output = "
+                                    ++ (n
+                                            |> Result.map (\x -> Scale.compute x scale)
+                                            |> toString
+                                       )
+                                )
+                            ]
 
                     ArithmeticError str op ->
                         [ div [ style [ ( "color", "red" ) ] ]

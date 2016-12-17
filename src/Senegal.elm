@@ -1,7 +1,8 @@
 module Senegal exposing (..)
 
 import Operations exposing (..)
-import Types exposing (..)
+import Scale exposing (..)
+import Value exposing (..)
 
 
 nbParts : BooleanOperation -> BooleanOperation -> ArithmeticOperation -> ArithmeticOperation

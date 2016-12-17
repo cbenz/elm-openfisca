@@ -1,5 +1,9 @@
 module Numeric exposing (..)
 
+{-| Imitates https://docs.scipy.org/doc/numpy/reference/generated/numpy.linspace.html
+Not optimized!
+-}
+
 
 linspace : Float -> Float -> Int -> List Float
 linspace mini maxi num =
