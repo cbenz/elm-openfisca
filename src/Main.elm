@@ -6,6 +6,7 @@ import Html.Events exposing (..)
 import Numeric
 import Operations exposing (..)
 import Plot exposing (..)
+import Scale
 import Senegal
 import String
 
@@ -117,11 +118,15 @@ subscriptions model =
 view : Model -> Html Msg
 view model =
     let
+        bareme2013 =
+            -- Senegal.baremeImpotProgressif2013
+            Scale.atDate "2013-01-01" Senegal.baremeImpotProgressif
+
         impotRevenusOperation =
-            Senegal.impotRevenus model.estMarie model.conjointADesRevenus model.nbEnfants model.salaire
+            Senegal.impotRevenus model.estMarie model.conjointADesRevenus model.nbEnfants model.salaire bareme2013
 
         impotProgressifOperation =
-            ScaleEvaluation Senegal.baremeImpotProgressif "2013-01-01" model.salaire
+            ScaleEvaluation bareme2013 model.salaire
 
         nbPartsOperation =
             Senegal.nbParts model.estMarie model.conjointADesRevenus model.nbEnfants
@@ -232,11 +237,19 @@ view model =
             , div []
                 [ h2 [] [ text "Variation of salary on X axis" ]
                 , viewPlot
-                    [ ( ScaleEvaluation Senegal.baremeImpotProgressif "2013-01-01", "blue" )
-                    , ( Senegal.impotRevenus model.estMarie model.conjointADesRevenus model.nbEnfants, "red" )
+                    [ ( ScaleEvaluation bareme2013, "blue" )
+                    , ( \salaire ->
+                            Senegal.impotRevenus
+                                model.estMarie
+                                model.conjointADesRevenus
+                                model.nbEnfants
+                                salaire
+                                bareme2013
+                      , "red"
+                      )
                     , ( (\salaire ->
                             Senegal.reductionImpotsPourChargeFamille
-                                (ScaleEvaluation Senegal.baremeImpotProgressif "2013-01-01" salaire)
+                                (ScaleEvaluation bareme2013 salaire)
                                 nbPartsOperation
                         )
                       , "green"

@@ -3,6 +3,7 @@ module Operations exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Scale exposing (..)
+import Value exposing (..)
 
 
 type ArithmeticOperation
@@ -15,7 +16,7 @@ type ArithmeticOperation
     | Max ArithmeticOperation ArithmeticOperation
     | Min ArithmeticOperation ArithmeticOperation
     | Condition BooleanOperation ArithmeticOperation ArithmeticOperation
-    | ScaleEvaluation ScaleWithDate Date ArithmeticOperation
+    | ScaleEvaluation Scale ArithmeticOperation
     | ArithmeticError String ArithmeticOperation
 
 
@@ -52,8 +53,8 @@ substract op1 op2 =
 evalArithmeticOperation : ArithmeticOperation -> Result String Float
 evalArithmeticOperation op =
     case op of
-        Number float ->
-            Ok float
+        Number value ->
+            Ok value
 
         Add op1 op2 ->
             Result.map2
@@ -96,16 +97,12 @@ evalArithmeticOperation op =
             else
                 evalArithmeticOperation op2
 
-        ScaleEvaluation scaleWithDate date op ->
-            let
-                scale =
-                    atDate date scaleWithDate
-            in
-                Result.map (\x -> Scale.compute x scale)
-                    (evalArithmeticOperation op)
+        ScaleEvaluation scale op ->
+            Result.map (\x -> Scale.compute x scale)
+                (evalArithmeticOperation op)
 
         ArithmeticError str op ->
-            Err (str ++ ": " ++ (toString (evalArithmeticOperation op)))
+            Err (str ++ ": " ++ (Basics.toString (evalArithmeticOperation op)))
 
 
 evalBooleanOperation : BooleanOperation -> Bool
@@ -137,8 +134,8 @@ viewArithmeticOperation attrs op =
         ul attrs
             [ li []
                 (case op of
-                    Number n ->
-                        [ text ("Number " ++ (toString n)) ]
+                    Number value ->
+                        [ text ("Number " ++ (Basics.toString value)) ]
 
                     Add op1 op2 ->
                         viewChildren "Add" [ op1, op2 ]
@@ -189,32 +186,27 @@ viewArithmeticOperation attrs op =
                                 op2
                             ]
 
-                    ScaleEvaluation scaleWithDate date op ->
+                    ScaleEvaluation scale op ->
                         let
-                            scale =
-                                atDate date scaleWithDate
-
                             n =
                                 evalArithmeticOperation op
                         in
                             [ text "ScaleEvaluation"
-                            , br [] []
-                            , text ("at date = " ++ date)
                             , Scale.view scale
-                            , text ("input = " ++ (toString n))
+                            , text ("input = " ++ (Basics.toString n))
                             , br [] []
                             , text
                                 ("output = "
                                     ++ (n
                                             |> Result.map (\x -> Scale.compute x scale)
-                                            |> toString
+                                            |> Basics.toString
                                        )
                                 )
                             ]
 
                     ArithmeticError str op ->
                         [ div [ style [ ( "color", "red" ) ] ]
-                            [ text (str ++ ": " ++ (toString (evalArithmeticOperation op))) ]
+                            [ text (str ++ ": " ++ (Basics.toString (evalArithmeticOperation op))) ]
                         ]
                 )
             ]
@@ -230,7 +222,7 @@ viewBooleanOperation attrs op =
             [ li []
                 (case op of
                     Boolean value ->
-                        [ text ("Boolean " ++ (toString value)) ]
+                        [ text ("Boolean " ++ (Basics.toString value)) ]
 
                     And op1 op2 ->
                         viewChildren "And" [ op1, op2 ]

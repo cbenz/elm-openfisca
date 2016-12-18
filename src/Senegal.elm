@@ -106,17 +106,18 @@ baremeImpotProgressif =
             ]
 
 
-baremeImpotProgressif2013 : Scale
-baremeImpotProgressif2013 =
-    scale
-        (MonetaryAmount "CFA")
-        [ ( 0, 0 )
-        , ( 630000, 0.2 )
-        , ( 1500000, 0.3 )
-        , ( 4000000, 0.35 )
-        , ( 8000000, 0.37 )
-        , ( 13500000, 0.4 )
-        ]
+
+-- baremeImpotProgressif2013 : Scale
+-- baremeImpotProgressif2013 =
+--     scale
+--         (MonetaryAmount "CFA")
+--         [ ( 0, 0 )
+--         , ( 630000, 0.2 )
+--         , ( 1500000, 0.3 )
+--         , ( 4000000, 0.35 )
+--         , ( 8000000, 0.37 )
+--         , ( 13500000, 0.4 )
+--         ]
 
 
 impotRevenus :
@@ -124,16 +125,17 @@ impotRevenus :
     -> BooleanOperation
     -> ArithmeticOperation
     -> ArithmeticOperation
+    -> Scale
     -> ArithmeticOperation
-impotRevenus estMarie conjointADesRevenus nbEnfants salaire =
+impotRevenus estMarie conjointADesRevenus nbEnfants salaire bareme =
     let
         impotProgressif =
-            ScaleEvaluation baremeImpotProgressif "2013-01-01" salaire
+            ScaleEvaluation bareme salaire
 
-        nbPartsValue =
+        nbPartsOperation =
             nbParts estMarie conjointADesRevenus nbEnfants
     in
         substract
             impotProgressif
-            (reductionImpotsPourChargeFamille impotProgressif nbPartsValue)
+            (reductionImpotsPourChargeFamille impotProgressif nbPartsOperation)
             |> Max (Number 0)
