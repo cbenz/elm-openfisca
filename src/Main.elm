@@ -4,7 +4,6 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Numeric
-import Operations exposing (..)
 import Plot exposing (..)
 import Scale
 import Senegal
@@ -26,19 +25,19 @@ main =
 
 
 type alias Model =
-    { conjointADesRevenus : BooleanOperation
-    , estMarie : BooleanOperation
-    , nbEnfants : ArithmeticOperation
-    , salaire : ArithmeticOperation
+    { conjointADesRevenus : Bool
+    , estMarie : Bool
+    , nbEnfants : Int
+    , salaire : Float
     }
 
 
 initialModel : Model
 initialModel =
-    { conjointADesRevenus = Boolean False
-    , estMarie = Boolean False
-    , nbEnfants = Number 0
-    , salaire = Number 630000
+    { conjointADesRevenus = False
+    , estMarie = False
+    , nbEnfants = 0
+    , salaire = 630000
     }
 
 
@@ -62,12 +61,12 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         SetConjointADesRevenus bool ->
-            ( { model | conjointADesRevenus = Boolean bool }
+            ( { model | conjointADesRevenus = bool }
             , Cmd.none
             )
 
         SetEstMarie bool ->
-            ( { model | estMarie = Boolean bool }
+            ( { model | estMarie = bool }
             , Cmd.none
             )
 
@@ -75,11 +74,11 @@ update msg model =
             let
                 newModel =
                     if String.isEmpty str then
-                        { model | nbEnfants = Number 0 }
+                        { model | nbEnfants = 0 }
                     else
                         case String.toInt str of
                             Ok int ->
-                                { model | nbEnfants = Number (toFloat int) }
+                                { model | nbEnfants = int }
 
                             Err _ ->
                                 model
@@ -90,11 +89,11 @@ update msg model =
             let
                 newModel =
                     if String.isEmpty str then
-                        { model | salaire = Number 0 }
+                        { model | salaire = 0 }
                     else
                         case String.toFloat str of
                             Ok float ->
-                                { model | salaire = Number float }
+                                { model | salaire = float }
 
                             Err _ ->
                                 model
@@ -122,13 +121,13 @@ view model =
             -- Senegal.baremeImpotProgressif2013
             Scale.atDate "2013-01-01" Senegal.baremeImpotProgressif
 
-        impotRevenusOperation =
+        impotRevenus =
             Senegal.impotRevenus model.estMarie model.conjointADesRevenus model.nbEnfants model.salaire bareme2013
 
-        impotProgressifOperation =
-            ScaleEvaluation bareme2013 model.salaire
+        impotProgressif =
+            Scale.compute model.salaire bareme2013
 
-        nbPartsOperation =
+        nbParts =
             Senegal.nbParts model.estMarie model.conjointADesRevenus model.nbEnfants
     in
         div [ style [ ( "margin", "1em" ) ] ]
@@ -150,12 +149,7 @@ view model =
                         , onInput SetSalaire
                         , step "1000"
                         , type_ "number"
-                        , Html.Attributes.value
-                            (model.salaire
-                                |> evalArithmeticOperation
-                                |> Result.withDefault 0
-                                |> toString
-                            )
+                        , Html.Attributes.value (toString model.salaire)
                         ]
                         []
                     , text " francs CFA"
@@ -163,7 +157,7 @@ view model =
                 , br [] []
                 , label []
                     [ input
-                        [ checked (evalBooleanOperation model.estMarie)
+                        [ checked model.estMarie
                         , onCheck SetEstMarie
                         , type_ "checkbox"
                         ]
@@ -173,7 +167,7 @@ view model =
                 , br [] []
                 , label []
                     [ input
-                        [ checked (evalBooleanOperation model.conjointADesRevenus)
+                        [ checked model.conjointADesRevenus
                         , onCheck SetConjointADesRevenus
                         , type_ "checkbox"
                         ]
@@ -187,57 +181,35 @@ view model =
                         [ Html.Attributes.min "0"
                         , onInput SetNbEnfants
                         , type_ "number"
-                        , Html.Attributes.value
-                            (model.nbEnfants
-                                |> evalArithmeticOperation
-                                |> Result.withDefault 0
-                                |> toString
-                            )
+                        , Html.Attributes.value (toString model.nbEnfants)
                         ]
                         []
                     ]
                 ]
             , p []
-                [ text
-                    ("nb parts = "
-                        ++ (nbPartsOperation
-                                |> evalArithmeticOperation
-                                |> toString
-                           )
-                    )
+                [ text ("nb parts = " ++ (toString nbParts))
                 ]
             , p []
                 [ text
-                    ("impôt progressif = "
-                        ++ (impotProgressifOperation
-                                |> evalArithmeticOperation
-                                |> toString
-                           )
-                    )
+                    ("impôt progressif = " ++ (toString impotProgressif))
                 ]
             , p []
                 [ text
                     ("réductions pour charge de famille = "
-                        ++ (Senegal.reductionImpotsPourChargeFamille impotProgressifOperation nbPartsOperation
-                                |> evalArithmeticOperation
+                        ++ (Senegal.reductionImpotsPourChargeFamille impotProgressif nbParts
                                 |> toString
                            )
                     )
                 ]
             , p []
-                [ text
-                    ("impôt = "
-                        ++ (impotRevenusOperation
-                                |> evalArithmeticOperation
-                                |> toString
-                           )
-                    )
+                [ text ("impôt = " ++ (toString impotRevenus))
                 ]
             , hr [] []
             , div []
                 [ h2 [] [ text "Variation of salary on X axis" ]
                 , viewPlot
-                    [ ( ScaleEvaluation bareme2013, "blue" )
+                    model.salaire
+                    [ ( \salaire -> Scale.compute salaire bareme2013, "blue" )
                     , ( \salaire ->
                             Senegal.impotRevenus
                                 model.estMarie
@@ -245,68 +217,33 @@ view model =
                                 model.nbEnfants
                                 salaire
                                 bareme2013
+                                |> Result.withDefault -1
                       , "red"
                       )
                     , ( (\salaire ->
                             Senegal.reductionImpotsPourChargeFamille
-                                (ScaleEvaluation bareme2013 salaire)
-                                nbPartsOperation
+                                (Scale.compute salaire bareme2013)
+                                nbParts
+                                |> Result.withDefault -1
                         )
                       , "green"
                       )
                     ]
                 ]
-            , hr [] []
-            , p
-                []
-                [ text "viewArithmeticOperation impotRevenusOperation"
-                , viewArithmeticOperation [] impotRevenusOperation
-                ]
-              -- , hr [] []
-              -- , ul
-              --     []
-              --     (List.map
-              --         (\scale ->
-              --             li []
-              --                 [ Scale.view scale ]
-              --         )
-              --         model.scales
-              --     )
-              -- , ul []
-              --     (List.map
-              --         (\scaleWithDate ->
-              --             ul []
-              --                 (List.map
-              --                     (\date ->
-              --                         li []
-              --                             (let
-              --                                 scale =
-              --                                     scaleWithDate |> Scale.atDate date
-              --                              in
-              --                                 [ Scale.view scale ]
-              --                             )
-              --                     )
-              --                     [ "2014-01-01", "2015-01-01" ]
-              --                 )
-              --         )
-              --         model.timeChangingScales
-              --     )
             ]
 
 
-viewPlot : List ( ArithmeticOperation -> ArithmeticOperation, String ) -> Html msg
-viewPlot funcs =
+viewPlot : Float -> List ( Float -> Float, String ) -> Html msg
+viewPlot x funcs =
     let
         salaires =
-            Numeric.linspace 0 16000000 100
+            Numeric.linspace 0 16000000 1000
 
         points func =
             List.map
                 (\salaire ->
                     ( salaire
-                    , func (Number salaire)
-                        |> evalArithmeticOperation
-                        |> Result.withDefault 0
+                    , func salaire
                     )
                 )
                 salaires
@@ -314,6 +251,8 @@ viewPlot funcs =
         plot [ plotStyle [ ( "padding", "0 0 2em 5em" ) ] ]
             ([ xAxis []
              , yAxis []
+             , line [ lineStyle [ ( "fill", "none" ), ( "stroke", "gray" ) ] ]
+                [ ( x, 0 ), ( x, 5000000 ) ]
              ]
                 ++ (List.map
                         (\( func, color ) ->

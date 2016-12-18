@@ -1,29 +1,35 @@
 module Senegal exposing (..)
 
-import Operations exposing (..)
 import Scale exposing (..)
-import Value exposing (..)
+import Value exposing (Value(..))
 
 
-nbParts : BooleanOperation -> BooleanOperation -> ArithmeticOperation -> ArithmeticOperation
+nbParts : Bool -> Bool -> Int -> Float
 nbParts estMarie conjointADesRevenus nbEnfants =
     let
-        nbPartsPersonne =
-            Number 1
+        nbPartsIndividu =
+            1
 
         nbPartsConjoint =
-            Add
-                (Condition estMarie (Number 0.5) (Number 0))
-                (Condition conjointADesRevenus (Number 0) (Number 0.5))
+            (if estMarie then
+                0.5
+             else
+                0
+            )
+                + (if conjointADesRevenus then
+                    0
+                   else
+                    0.5
+                  )
 
         nbPartsEnfants =
-            Mul nbEnfants (Number 0.5)
+            (toFloat nbEnfants) * 0.5
     in
-        add3 nbPartsPersonne nbPartsConjoint nbPartsEnfants
-            |> Min (Number 5)
+        List.sum [ nbPartsIndividu, nbPartsConjoint, nbPartsEnfants ]
+            |> min 5
 
 
-reductionImpotsPourChargeFamille : ArithmeticOperation -> ArithmeticOperation -> ArithmeticOperation
+reductionImpotsPourChargeFamille : Float -> Float -> Result String Float
 reductionImpotsPourChargeFamille impotProgressif nbParts =
     let
         data =
@@ -41,25 +47,21 @@ reductionImpotsPourChargeFamille impotProgressif nbParts =
         findValue xs getter =
             case xs of
                 [] ->
-                    ArithmeticError "nbParts not found" nbParts
+                    Err ("nbParts = " ++ (toString nbParts) ++ " not found")
 
-                ( nbParts2, values ) :: tail ->
-                    Condition
-                        (Equals nbParts (Number nbParts2))
-                        (Number (getter values))
-                        (findValue tail getter)
-
-        taux =
-            findValue data .taux
-
-        minimum =
-            findValue data .minimum
-
-        maximum =
-            findValue data .maximum
+                ( nbPartsOfItem, values ) :: tail ->
+                    if nbParts == nbPartsOfItem then
+                        Ok (getter values)
+                    else
+                        findValue tail getter
     in
-        Mul impotProgressif taux
-            |> clip minimum maximum
+        Result.map3
+            (\taux minimum maximum ->
+                clamp minimum maximum (impotProgressif * taux)
+            )
+            (findValue data .taux)
+            (findValue data .minimum)
+            (findValue data .maximum)
 
 
 baremeImpotProgressif : ScaleWithDate
@@ -120,22 +122,17 @@ baremeImpotProgressif =
 --         ]
 
 
-impotRevenus :
-    BooleanOperation
-    -> BooleanOperation
-    -> ArithmeticOperation
-    -> ArithmeticOperation
-    -> Scale
-    -> ArithmeticOperation
+impotRevenus : Bool -> Bool -> Int -> Float -> Scale -> Result String Float
 impotRevenus estMarie conjointADesRevenus nbEnfants salaire bareme =
     let
         impotProgressif =
-            ScaleEvaluation bareme salaire
+            Scale.compute salaire bareme
 
         nbPartsOperation =
             nbParts estMarie conjointADesRevenus nbEnfants
     in
-        substract
-            impotProgressif
-            (reductionImpotsPourChargeFamille impotProgressif nbPartsOperation)
-            |> Max (Number 0)
+        reductionImpotsPourChargeFamille impotProgressif nbPartsOperation
+            |> Result.map
+                (\reductionImpotsPourChargeFamille ->
+                    max 0 (impotProgressif - reductionImpotsPourChargeFamille)
+                )
