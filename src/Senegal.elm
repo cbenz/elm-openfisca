@@ -3,6 +3,7 @@ module Senegal exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import MonetaryAmount exposing (MonetaryAmount(..))
 import Numeric
 import Plot exposing (..)
 import Scale exposing (..)

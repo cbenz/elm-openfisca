@@ -2,7 +2,8 @@ module DummyBenefit exposing (..)
 
 import Dict exposing (Dict)
 import Html exposing (..)
-import Types exposing (Currency, MonetaryAmount(..))
+import MonetaryAmount exposing (MonetaryAmount(..))
+import Types exposing (Currency)
 
 
 -- CONSTANTS
@@ -41,13 +42,7 @@ benefit month salaire =
 
 income : Month -> (Month -> MonetaryAmount) -> MonetaryAmount
 income month salaire =
-    let
-        toFloat (MonetaryAmount _ f) =
-            f
-    in
-        (salaire month |> toFloat)
-            + (benefit month salaire |> toFloat)
-            |> MonetaryAmount currency
+    MonetaryAmount.map2 (+) (salaire month) (benefit month salaire)
 
 
 
