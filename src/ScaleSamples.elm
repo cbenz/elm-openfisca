@@ -28,7 +28,7 @@ baremeImpotFrance2015 =
 
 
 baremeImpotFrance =
-    scaleWithDate
+    scaleWithDates
         (MonetaryAmount "€")
         [ { thresholds =
                 [ ( "2014-01-01", "2015-12-31", 0 )

@@ -2,11 +2,11 @@ module Scale exposing (..)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Value exposing (Value(..))
+import Types exposing (..)
 
 
-type alias Bracket =
-    { thresholds : List ( Date, Date, Float )
+type alias Bracket value =
+    { thresholds : List ( Date, Date, value )
     , rates : List ( Date, Date, Rate )
     }
 
@@ -15,36 +15,29 @@ type alias Date =
     String
 
 
-type alias Rate =
-    Float
+type alias Scale value =
+    List ( value, Rate )
 
 
-type alias Scale =
-    List ( Value, Rate )
-
-
-type alias ScaleWithDate =
-    List
-        { thresholds : List ( Date, Date, Value )
-        , rates : List ( Date, Date, Rate )
-        }
+type alias ScaleWithDates value =
+    List (Bracket value)
 
 
 
 -- BUILD VALUES
 
 
-scale : (number -> Value) -> List ( number, Rate ) -> Scale
+scale : (number -> value) -> List ( number, Float ) -> Scale value
 scale thresholdTagger brackets =
     List.map
-        (\( threshold, rate ) -> ( thresholdTagger threshold, rate ))
+        (\( threshold, rate ) -> ( thresholdTagger threshold, Rate rate ))
         brackets
 
 
-{-| Build a `ScaleWithDate` from a `List Bracket`.
+{-| Build a `ScaleWithDates`.
 
 Example:
-    scaleWithDate
+    scaleWithDates
         (MonetaryAmount "€")
         [ { thresholds =
                 [ ( "2014-01-01", "2015-12-31", 0 )
@@ -55,15 +48,24 @@ Example:
           }
         ]
 -}
-scaleWithDate : (Float -> Value) -> List Bracket -> ScaleWithDate
-scaleWithDate thresholdTagger brackets =
+scaleWithDates :
+    (Float -> value)
+    -> List
+        { thresholds : List ( Date, Date, Float )
+        , rates : List ( Date, Date, Float )
+        }
+    -> ScaleWithDates value
+scaleWithDates thresholdTagger brackets =
     List.map
         (\{ thresholds, rates } ->
             { thresholds =
                 List.map
                     (\( start, stop, threshold ) -> ( start, stop, thresholdTagger threshold ))
                     thresholds
-            , rates = rates
+            , rates =
+                List.map
+                    (\( start, stop, threshold ) -> ( start, stop, Rate threshold ))
+                    rates
             }
         )
         brackets
@@ -73,26 +75,26 @@ scaleWithDate thresholdTagger brackets =
 -- COMPUTE
 
 
-compute : Float -> Scale -> Float
-compute inputValue scale =
+compute : value -> (value -> Float) -> (Float -> value) -> Scale value -> value
+compute inputValue valueToFloat tagger scale =
     let
         matchingBrackets =
             scale
                 |> List.reverse
-                |> List.filter (\( threshold, _ ) -> inputValue > (Value.toFloat threshold))
+                |> List.filter (\( threshold, _ ) -> valueToFloat inputValue > valueToFloat threshold)
     in
         List.map2
-            (\( threshold, rate ) previousThreshold ->
+            (\( threshold, Rate rate ) previousThreshold ->
                 let
                     thresholdValue =
-                        Value.toFloat threshold
+                        valueToFloat threshold
                 in
                     case previousThreshold of
                         Nothing ->
-                            (inputValue - thresholdValue) * rate
+                            (valueToFloat inputValue - thresholdValue) * rate
 
                         Just previousThreshold ->
-                            ((Value.toFloat previousThreshold) - thresholdValue) * rate
+                            ((valueToFloat previousThreshold) - thresholdValue) * rate
             )
             matchingBrackets
             (Nothing
@@ -101,9 +103,10 @@ compute inputValue scale =
                    )
             )
             |> List.sum
+            |> tagger
 
 
-atDate : Date -> ScaleWithDate -> Scale
+atDate : Date -> ScaleWithDates value -> Scale value
 atDate date scale =
     let
         findForDate xs =
@@ -128,8 +131,8 @@ atDate date scale =
 -- VIEW
 
 
-view : Scale -> Html msg
-view scale =
+view : Scale value -> (value -> Float) -> Html msg
+view scale valueToFloat =
     let
         tableWithBorders : List (List (Html msg)) -> Html msg
         tableWithBorders rows =
@@ -159,35 +162,31 @@ view scale =
                             )
                     )
                 ]
+
+        nextThresholds =
+            (scale
+                |> List.drop 1
+                |> List.map (\( threshold, _ ) -> Just threshold)
+            )
+                ++ [ Nothing ]
     in
         div []
             [ tableWithBorders
                 (List.map2
-                    (\( threshold, rate ) nextThreshold ->
-                        [ let
-                            toThreshold threshold =
-                                "jusqu'à " ++ (Value.toString threshold)
-                          in
-                            case ( threshold, nextThreshold ) of
-                                ( MonetaryAmount _ 0, Just nextThreshold ) ->
-                                    text (toThreshold nextThreshold)
+                    (\( threshold, Rate rate ) nextThreshold ->
+                        [ case ( valueToFloat threshold, nextThreshold ) of
+                            ( 0, Just nextThreshold ) ->
+                                text ("jusqu'à " ++ (toString nextThreshold))
 
-                                ( Amount 0, Just nextThreshold ) ->
-                                    text (toThreshold nextThreshold)
+                            ( _, Just nextThreshold ) ->
+                                text ("de " ++ (toString threshold) ++ " à " ++ (toString nextThreshold))
 
-                                ( threshold, Just nextThreshold ) ->
-                                    text ("de " ++ (Value.toString threshold) ++ " à " ++ (Value.toString nextThreshold))
-
-                                ( threshold, Nothing ) ->
-                                    text ("supérieur à " ++ (Value.toString threshold))
-                        , text (toString rate)
+                            ( _, Nothing ) ->
+                                text ("supérieur à " ++ (toString threshold))
+                        , text ((toString (rate * 100)) ++ " %")
                         ]
                     )
                     scale
-                    ((List.drop 1 scale
-                        |> List.map (\( threshold, _ ) -> Just threshold)
-                     )
-                        ++ [ Nothing ]
-                    )
+                    nextThresholds
                 )
             ]

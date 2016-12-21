@@ -1,7 +1,24 @@
 module Senegal exposing (..)
 
+import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (..)
+import Numeric
+import Plot exposing (..)
 import Scale exposing (..)
-import Value exposing (Value(..))
+import Types exposing (..)
+
+
+-- CONSTANTS
+
+
+currency : String
+currency =
+    "CFA"
+
+
+
+-- FORMULAS
 
 
 nbParts : Bool -> Bool -> Int -> Float
@@ -26,11 +43,11 @@ nbParts estMarie conjointADesRevenus nbEnfants =
             (toFloat nbEnfants) * 0.5
     in
         List.sum [ nbPartsIndividu, nbPartsConjoint, nbPartsEnfants ]
-            |> min 5
+            |> Basics.min 5
 
 
-reductionImpotsPourChargeFamille : Float -> Float -> Result String Float
-reductionImpotsPourChargeFamille impotProgressif nbParts =
+reductionImpotsPourChargeFamille : MonetaryAmount -> Float -> Result String Float
+reductionImpotsPourChargeFamille (MonetaryAmount _ impotProgressif) nbParts =
     let
         data =
             [ ( 1, { taux = 0, minimum = 0, maximum = 0 } )
@@ -64,7 +81,7 @@ reductionImpotsPourChargeFamille impotProgressif nbParts =
             (findValue data .maximum)
 
 
-baremeImpotProgressif : ScaleWithDate
+baremeImpotProgressif : ScaleWithDates MonetaryAmount
 baremeImpotProgressif =
     let
         start =
@@ -73,8 +90,8 @@ baremeImpotProgressif =
         stop =
             "2013-12-31"
     in
-        scaleWithDate
-            (MonetaryAmount "CFA")
+        scaleWithDates
+            (MonetaryAmount currency)
             [ { thresholds =
                     [ ( start, stop, 0 ) ]
               , rates =
@@ -122,11 +139,18 @@ baremeImpotProgressif =
 --         ]
 
 
-impotRevenus : Bool -> Bool -> Int -> Float -> Scale -> Result String Float
+impotRevenus : Bool -> Bool -> Int -> MonetaryAmount -> Scale MonetaryAmount -> Result String Float
 impotRevenus estMarie conjointADesRevenus nbEnfants salaire bareme =
     let
+        toFloat (MonetaryAmount _ f) =
+            f
+
         impotProgressif =
-            Scale.compute salaire bareme
+            Scale.compute
+                salaire
+                toFloat
+                (MonetaryAmount currency)
+                bareme
 
         nbPartsOperation =
             nbParts estMarie conjointADesRevenus nbEnfants
@@ -134,5 +158,246 @@ impotRevenus estMarie conjointADesRevenus nbEnfants salaire bareme =
         reductionImpotsPourChargeFamille impotProgressif nbPartsOperation
             |> Result.map
                 (\reductionImpotsPourChargeFamille ->
-                    max 0 (impotProgressif - reductionImpotsPourChargeFamille)
+                    Basics.max 0 ((toFloat impotProgressif) - reductionImpotsPourChargeFamille)
                 )
+
+
+
+-- MODEL
+
+
+type alias Model =
+    { conjointADesRevenus : Bool
+    , estMarie : Bool
+    , nbEnfants : Int
+    , salaire : MonetaryAmount
+    }
+
+
+initialModel : Model
+initialModel =
+    { conjointADesRevenus = False
+    , estMarie = False
+    , nbEnfants = 0
+    , salaire = MonetaryAmount currency 630000
+    }
+
+
+
+-- UPDATE
+
+
+type Msg
+    = SetConjointADesRevenus Bool
+    | SetEstMarie Bool
+    | SetNbEnfants String
+    | SetSalaire String
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        SetConjointADesRevenus bool ->
+            ( { model | conjointADesRevenus = bool }
+            , Cmd.none
+            )
+
+        SetEstMarie bool ->
+            ( { model | estMarie = bool }
+            , Cmd.none
+            )
+
+        SetNbEnfants str ->
+            let
+                newModel =
+                    if String.isEmpty str then
+                        { model | nbEnfants = 0 }
+                    else
+                        case String.toInt str of
+                            Ok int ->
+                                { model | nbEnfants = int }
+
+                            Err _ ->
+                                model
+            in
+                ( newModel, Cmd.none )
+
+        SetSalaire str ->
+            let
+                newModel =
+                    if String.isEmpty str then
+                        { model | salaire = MonetaryAmount currency 0 }
+                    else
+                        case String.toFloat str of
+                            Ok float ->
+                                { model | salaire = MonetaryAmount currency float }
+
+                            Err _ ->
+                                model
+            in
+                ( newModel, Cmd.none )
+
+
+
+-- VIEW
+
+
+view : Model -> Html Msg
+view model =
+    let
+        baremeImpotProgressif2013 =
+            Scale.atDate "2013-01-01" baremeImpotProgressif
+
+        impotRevenusResult =
+            impotRevenus
+                model.estMarie
+                model.conjointADesRevenus
+                model.nbEnfants
+                model.salaire
+                baremeImpotProgressif2013
+
+        toFloat (MonetaryAmount _ f) =
+            f
+
+        impotProgressif =
+            Scale.compute
+                model.salaire
+                toFloat
+                (MonetaryAmount currency)
+                baremeImpotProgressif2013
+
+        nbPartsFloat =
+            nbParts model.estMarie model.conjointADesRevenus model.nbEnfants
+    in
+        div []
+            [ Html.form []
+                [ label []
+                    [ text "Salaire annuel "
+                    , input
+                        [ Html.Attributes.min "0"
+                        , onInput SetSalaire
+                        , step "1000"
+                        , type_ "number"
+                        , Html.Attributes.value (model.salaire |> toFloat |> toString)
+                        ]
+                        []
+                    , text " francs CFA"
+                    ]
+                , br [] []
+                , label []
+                    [ input
+                        [ checked model.estMarie
+                        , onCheck SetEstMarie
+                        , type_ "checkbox"
+                        ]
+                        []
+                    , text "est marié"
+                    ]
+                , br [] []
+                , label []
+                    [ input
+                        [ checked model.conjointADesRevenus
+                        , onCheck SetConjointADesRevenus
+                        , type_ "checkbox"
+                        ]
+                        []
+                    , text "conjoint a des revenus"
+                    ]
+                , br [] []
+                , label []
+                    [ text "Nb enfants "
+                    , input
+                        [ Html.Attributes.min "0"
+                        , onInput SetNbEnfants
+                        , type_ "number"
+                        , Html.Attributes.value (toString model.nbEnfants)
+                        ]
+                        []
+                    ]
+                ]
+            , p []
+                [ text ("nb parts = " ++ (toString nbPartsFloat))
+                ]
+            , Scale.view baremeImpotProgressif2013 toFloat
+            , p []
+                [ text
+                    ("impôt progressif = " ++ (toString impotProgressif))
+                ]
+            , p []
+                [ text
+                    ("réductions pour charge de famille = "
+                        ++ (reductionImpotsPourChargeFamille impotProgressif nbPartsFloat
+                                |> toString
+                           )
+                    )
+                ]
+            , p []
+                [ text ("impôt = " ++ (toString impotRevenusResult))
+                ]
+            , viewPlot
+                (toFloat model.salaire)
+                [ ( \salaire ->
+                        Scale.compute
+                            (MonetaryAmount currency salaire)
+                            toFloat
+                            (MonetaryAmount currency)
+                            baremeImpotProgressif2013
+                            |> toFloat
+                  , "blue"
+                  )
+                , ( \salaire ->
+                        impotRevenus
+                            model.estMarie
+                            model.conjointADesRevenus
+                            model.nbEnfants
+                            (MonetaryAmount currency salaire)
+                            baremeImpotProgressif2013
+                            |> Result.withDefault -1
+                  , "red"
+                  )
+                , ( (\salaire ->
+                        reductionImpotsPourChargeFamille
+                            (Scale.compute
+                                (MonetaryAmount currency salaire)
+                                toFloat
+                                (MonetaryAmount currency)
+                                baremeImpotProgressif2013
+                            )
+                            nbPartsFloat
+                            |> Result.withDefault -1
+                    )
+                  , "green"
+                  )
+                ]
+            ]
+
+
+viewPlot : Float -> List ( Float -> Float, String ) -> Html msg
+viewPlot x funcs =
+    let
+        salaires =
+            Numeric.linspace 0 16000000 1000
+
+        points func =
+            List.map
+                (\salaire ->
+                    ( salaire
+                    , func salaire
+                    )
+                )
+                salaires
+    in
+        plot [ plotStyle [ ( "padding", "0 0 2em 5em" ) ] ]
+            ([ xAxis []
+             , yAxis []
+             , line [ lineStyle [ ( "fill", "none" ), ( "stroke", "gray" ) ] ]
+                [ ( x, 0 ), ( x, 5000000 ) ]
+             ]
+                ++ (List.map
+                        (\( func, color ) ->
+                            line [ lineStyle [ ( "fill", "none" ), ( "stroke", color ) ] ]
+                                (points func)
+                        )
+                        funcs
+                   )
+            )
