@@ -69,8 +69,23 @@ irppScale =
     ]
 
 
-irpp : Year -> YearSerie EUR -> YearSerie EUR -> Maybe EUR
-irpp (Year year) salaireIndividu salaireConjoint =
+allocationLogement : Year -> YearSerie EUR -> YearSerie EUR -> Maybe EUR
+allocationLogement year salaireIndividu salaireConjoint =
+    Maybe.map2
+        (\(EUR salaireIndividuForYear) (EUR salaireConjointForYear) ->
+            EUR
+                (if salaireIndividuForYear + salaireConjointForYear < 30000 then
+                    2000
+                 else
+                    0
+                )
+        )
+        (salaireIndividu year)
+        (salaireConjoint year)
+
+
+irpp : Year -> YearSerie EUR -> YearSerie EUR -> YearSerie EUR -> Maybe EUR
+irpp (Year year) salaireIndividu salaireConjoint salaireEnfant1 =
     let
         lastYear =
             Year (year - 1)
@@ -78,16 +93,28 @@ irpp (Year year) salaireIndividu salaireConjoint =
         scaleForYear =
             Scale.atDate ((toString year) ++ "-01-01") irppScale
     in
-        Maybe.map2
-            (\(EUR salaireIndividu) (EUR salaireConjoint) ->
+        Maybe.map3
+            (\(EUR salaireIndividuForLastYear) (EUR salaireConjointForLastYear) (EUR salaireEnfant1ForLastYear) ->
                 let
                     salaires =
-                        EUR (salaireIndividu + salaireConjoint)
+                        EUR (salaireIndividuForLastYear + salaireConjointForLastYear + salaireEnfant1ForLastYear)
                 in
                     Scale.compute salaires (\(EUR x) -> x) EUR scaleForYear
             )
             (salaireIndividu lastYear)
             (salaireConjoint lastYear)
+            (salaireEnfant1 lastYear)
+
+
+revenuDisponible : Year -> YearSerie EUR -> YearSerie EUR -> YearSerie EUR -> Maybe EUR
+revenuDisponible year salaireIndividu salaireConjoint salaireEnfant1 =
+    Maybe.map2
+        (\(EUR irppForYear) (EUR allocationLogementForYear) ->
+            EUR (irppForYear + allocationLogementForYear)
+        )
+        (irpp year salaireIndividu salaireConjoint salaireEnfant1)
+        -- individu of menage is enfant1 of foyer fiscal, and has no conjoint!
+        (allocationLogement year salaireEnfant1 (constantSerie (EUR 0)))
 
 
 
@@ -97,6 +124,7 @@ irpp (Year year) salaireIndividu salaireConjoint =
 type alias Model =
     { salairesIndividu : Dict Int EUR
     , salairesConjoint : Dict Int EUR
+    , salairesEnfant1 : Dict Int EUR
     }
 
 
@@ -105,10 +133,17 @@ initialModel =
     { salairesIndividu =
         Dict.fromList
             [ ( 2014, EUR 40000 )
+            , ( 2015, EUR 40000 )
             ]
     , salairesConjoint =
         Dict.fromList
             [ ( 2014, EUR 10000 )
+            , ( 2015, EUR 15000 )
+            ]
+    , salairesEnfant1 =
+        Dict.fromList
+            [ ( 2014, EUR 20000 )
+            , ( 2015, EUR 15000 )
             ]
     }
 
@@ -131,12 +166,28 @@ view model =
         salaireConjoint =
             salaireFromData model.salairesConjoint
 
+        salaireEnfant1 =
+            salaireFromData model.salairesEnfant1
+
         scaleForYear =
             Scale.atDate "2015-01-01" irppScale
+
+        allocationLogement2015 =
+            -- individu of menage is enfant1 of foyer fiscal, and has no conjoint!
+            allocationLogement (Year 2015) salaireEnfant1 (constantSerie (EUR 0))
+
+        irpp2015 =
+            irpp (Year 2015) salaireIndividu salaireConjoint salaireEnfant1
+
+        revenuDisponible2015 =
+            revenuDisponible (Year 2015) salaireIndividu salaireConjoint salaireEnfant1
     in
         div []
             [ p [] [ text ("Salaire par an individu : " ++ (toString model.salairesIndividu)) ]
-            , p [] [ text ("Salaire par an conjoint: " ++ (toString model.salairesConjoint)) ]
+            , p [] [ text ("Salaire par an conjoint : " ++ (toString model.salairesConjoint)) ]
+            , p [] [ text ("Salaire par an enfant 1 : " ++ (toString model.salairesEnfant1)) ]
             , p [] [ Scale.view (\(EUR x) -> x) scaleForYear ]
-            , p [] [ text ("irpp 2015 = " ++ (toString (irpp (Year 2015) salaireIndividu salaireConjoint))) ]
+            , p [] [ text ("irpp 2015 = " ++ (toString irpp2015)) ]
+            , p [] [ text ("allocationLogement 2015 = " ++ (toString allocationLogement2015)) ]
+            , p [] [ text ("revenuDisponible 2015 = " ++ (toString revenuDisponible2015)) ]
             ]

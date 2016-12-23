@@ -23,3 +23,8 @@ type Year
 
 type alias YearSerie a =
     Year -> Maybe a
+
+
+constantSerie : value -> a -> Maybe value
+constantSerie constant =
+    always (Just constant)
