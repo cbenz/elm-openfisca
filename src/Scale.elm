@@ -34,43 +34,6 @@ scale thresholdTagger brackets =
         brackets
 
 
-{-| Build a `ScaleWithDates`.
-
-Example:
-    scaleWithDates
-        Euro
-        [ { thresholds =
-                [ ( "2014-01-01", "2015-12-31", 0 )
-                ]
-          , rates =
-                [ ( "2014-01-01", "2015-12-31", 0 )
-                ]
-          }
-        ]
--}
-scaleWithDates :
-    (Float -> value)
-    -> List
-        { thresholds : List ( Date, Date, Float )
-        , rates : List ( Date, Date, Float )
-        }
-    -> ScaleWithDates value
-scaleWithDates thresholdTagger brackets =
-    List.map
-        (\{ thresholds, rates } ->
-            { thresholds =
-                List.map
-                    (\( start, stop, threshold ) -> ( start, stop, thresholdTagger threshold ))
-                    thresholds
-            , rates =
-                List.map
-                    (\( start, stop, threshold ) -> ( start, stop, Rate threshold ))
-                    rates
-            }
-        )
-        brackets
-
-
 
 -- COMPUTE
 

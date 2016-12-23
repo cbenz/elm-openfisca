@@ -86,39 +86,37 @@ baremeImpotProgressif =
         stop =
             "2013-12-31"
     in
-        scaleWithDates
-            CFA
-            [ { thresholds =
-                    [ ( start, stop, 0 ) ]
-              , rates =
-                    [ ( start, stop, 0 ) ]
-              }
-            , { thresholds =
-                    [ ( start, stop, 630000 ) ]
-              , rates =
-                    [ ( start, stop, 0.2 ) ]
-              }
-            , { thresholds =
-                    [ ( start, stop, 1500000 ) ]
-              , rates =
-                    [ ( start, stop, 0.3 ) ]
-              }
-            , { thresholds =
-                    [ ( start, stop, 4000000 ) ]
-              , rates =
-                    [ ( start, stop, 0.35 ) ]
-              }
-            , { thresholds =
-                    [ ( start, stop, 8000000 ) ]
-              , rates =
-                    [ ( start, stop, 0.37 ) ]
-              }
-            , { thresholds =
-                    [ ( start, stop, 13500000 ) ]
-              , rates =
-                    [ ( start, stop, 0.4 ) ]
-              }
-            ]
+        [ { thresholds =
+                [ ( start, stop, CFA 0 ) ]
+          , rates =
+                [ ( start, stop, Rate 0 ) ]
+          }
+        , { thresholds =
+                [ ( start, stop, CFA 630000 ) ]
+          , rates =
+                [ ( start, stop, Rate 0.2 ) ]
+          }
+        , { thresholds =
+                [ ( start, stop, CFA 1500000 ) ]
+          , rates =
+                [ ( start, stop, Rate 0.3 ) ]
+          }
+        , { thresholds =
+                [ ( start, stop, CFA 4000000 ) ]
+          , rates =
+                [ ( start, stop, Rate 0.35 ) ]
+          }
+        , { thresholds =
+                [ ( start, stop, CFA 8000000 ) ]
+          , rates =
+                [ ( start, stop, Rate 0.37 ) ]
+          }
+        , { thresholds =
+                [ ( start, stop, CFA 13500000 ) ]
+          , rates =
+                [ ( start, stop, Rate 0.4 ) ]
+          }
+        ]
 
 
 impotRevenus : Bool -> Bool -> Int -> CFA -> Scale CFA -> Result String CFA
