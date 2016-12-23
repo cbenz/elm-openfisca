@@ -7,7 +7,6 @@ import MonetaryAmount exposing (MonetaryAmount(..))
 import Numeric
 import Plot exposing (..)
 import Scale exposing (..)
-import Types exposing (..)
 
 
 -- CONSTANTS
