@@ -139,9 +139,8 @@ impotRevenus estMarie conjointADesRevenus nbEnfants salaire bareme =
                         (CFA impotProgressifFloat) =
                             impotProgressif
                     in
-                        Basics.max 0 (impotProgressifFloat - reductionImpotsPourChargeFamille)
+                        (CFA (Basics.max 0 (impotProgressifFloat - reductionImpotsPourChargeFamille)))
                 )
-            |> Result.map CFA
 
 
 
