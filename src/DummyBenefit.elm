@@ -2,47 +2,38 @@ module DummyBenefit exposing (..)
 
 import Dict exposing (Dict)
 import Html exposing (..)
-import MonetaryAmount exposing (MonetaryAmount(..))
-import Types exposing (Currency)
+import Types exposing (..)
 
 
--- CONSTANTS
-
-
-currency : Currency
-currency =
-    "€"
+type EUR
+    = EUR Float
 
 
 
 -- FORMULAS
 
 
-type alias Month =
-    Int
+benefit : Month -> MonthSerie EUR -> EUR
+benefit (Month month) salaire =
+    (List.range 1 3
+        |> List.map (\i -> salaire (Month (month - i)))
+        |> List.map (\(EUR f) -> f)
+        |> List.sum
+    )
+        * 0.7
+        |> EUR
 
 
-benefit : Month -> (Month -> MonetaryAmount) -> MonetaryAmount
-benefit month salaire =
-    let
-        toFloat (MonetaryAmount _ f) =
-            f
-    in
-        (List.range 1 3
-            |> List.map
-                (\n ->
-                    salaire (month - n)
-                        |> toFloat
-                )
-            |> List.sum
-        )
-            * 0.7
-            |> MonetaryAmount currency
-
-
-income : Month -> (Month -> MonetaryAmount) -> MonetaryAmount
+income : Month -> MonthSerie EUR -> EUR
 income month salaire =
-    MonetaryAmount.map2 (+) (salaire month) (benefit month salaire)
+    let
+        (EUR salaireM) =
+            salaire month
+
+        (EUR benefitM) =
+            benefit month salaire
+    in
+        EUR (salaireM + benefitM)
 
 
 
@@ -50,7 +41,7 @@ income month salaire =
 
 
 type alias Model =
-    { salaires : Dict Month MonetaryAmount
+    { salaires : Dict Int EUR
     }
 
 
@@ -58,19 +49,19 @@ initialModel : Model
 initialModel =
     { salaires =
         Dict.fromList
-            [ ( 1, MonetaryAmount currency 1000 )
-            , ( 2, MonetaryAmount currency 1500 )
-            , ( 3, MonetaryAmount currency 1800 )
-            , ( 4, MonetaryAmount currency 2000 )
+            [ ( 1, EUR 1000 )
+            , ( 2, EUR 1500 )
+            , ( 3, EUR 1800 )
+            , ( 4, EUR 2000 )
             ]
     }
 
 
-salaireFromData : Dict Month MonetaryAmount -> Month -> MonetaryAmount
+salaireFromData : Dict Int EUR -> Month -> EUR
 salaireFromData salaires =
-    (\month ->
+    (\(Month month) ->
         Dict.get month salaires
-            |> Maybe.withDefault (MonetaryAmount currency 0)
+            |> Maybe.withDefault (EUR 0)
      -- TODO Handle Nothing in caller
     )
 
@@ -86,9 +77,9 @@ view model =
             salaireFromData model.salaires
     in
         div []
-            [ p [] [ text ("Salaires par mois: " ++ (toString model.salaires)) ]
+            [ p [] [ text ("Salaire par mois : " ++ (toString model.salaires)) ]
             , p []
-                [ text ("benefit month_4 = " ++ (toString (benefit 4 salaire))) ]
+                [ text ("benefit month_4 = " ++ (toString (benefit (Month 4) salaire))) ]
             , p []
-                [ text ("income month_4 = " ++ (toString (income 4 salaire))) ]
+                [ text ("income month_4 = " ++ (toString (income (Month 4) salaire))) ]
             ]

@@ -3,18 +3,13 @@ module Senegal exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import MonetaryAmount exposing (MonetaryAmount(..))
 import Numeric
 import Plot exposing (..)
 import Scale exposing (..)
 
 
--- CONSTANTS
-
-
-currency : String
-currency =
-    "CFA"
+type CFA
+    = CFA Float
 
 
 
@@ -46,8 +41,8 @@ nbParts estMarie conjointADesRevenus nbEnfants =
             |> Basics.min 5
 
 
-reductionImpotsPourChargeFamille : MonetaryAmount -> Float -> Result String Float
-reductionImpotsPourChargeFamille (MonetaryAmount _ impotProgressif) nbParts =
+reductionImpotsPourChargeFamille : CFA -> Float -> Result String CFA
+reductionImpotsPourChargeFamille (CFA impotProgressif) nbParts =
     let
         data =
             [ ( 1, { taux = 0, minimum = 0, maximum = 0 } )
@@ -79,9 +74,10 @@ reductionImpotsPourChargeFamille (MonetaryAmount _ impotProgressif) nbParts =
             (findValue data .taux)
             (findValue data .minimum)
             (findValue data .maximum)
+            |> Result.map CFA
 
 
-baremeImpotProgressif : ScaleWithDates MonetaryAmount
+baremeImpotProgressif : ScaleWithDates CFA
 baremeImpotProgressif =
     let
         start =
@@ -91,7 +87,7 @@ baremeImpotProgressif =
             "2013-12-31"
     in
         scaleWithDates
-            (MonetaryAmount currency)
+            CFA
             [ { thresholds =
                     [ ( start, stop, 0 ) ]
               , rates =
@@ -125,31 +121,14 @@ baremeImpotProgressif =
             ]
 
 
-
--- baremeImpotProgressif2013 : Scale
--- baremeImpotProgressif2013 =
---     scale
---         (MonetaryAmount "CFA")
---         [ ( 0, 0 )
---         , ( 630000, 0.2 )
---         , ( 1500000, 0.3 )
---         , ( 4000000, 0.35 )
---         , ( 8000000, 0.37 )
---         , ( 13500000, 0.4 )
---         ]
-
-
-impotRevenus : Bool -> Bool -> Int -> MonetaryAmount -> Scale MonetaryAmount -> Result String Float
+impotRevenus : Bool -> Bool -> Int -> CFA -> Scale CFA -> Result String CFA
 impotRevenus estMarie conjointADesRevenus nbEnfants salaire bareme =
     let
-        toFloat (MonetaryAmount _ f) =
-            f
-
         impotProgressif =
             Scale.compute
                 salaire
-                toFloat
-                (MonetaryAmount currency)
+                (\(CFA float) -> float)
+                CFA
                 bareme
 
         nbPartsOperation =
@@ -157,9 +136,14 @@ impotRevenus estMarie conjointADesRevenus nbEnfants salaire bareme =
     in
         reductionImpotsPourChargeFamille impotProgressif nbPartsOperation
             |> Result.map
-                (\reductionImpotsPourChargeFamille ->
-                    Basics.max 0 ((toFloat impotProgressif) - reductionImpotsPourChargeFamille)
+                (\(CFA reductionImpotsPourChargeFamille) ->
+                    let
+                        (CFA impotProgressifFloat) =
+                            impotProgressif
+                    in
+                        Basics.max 0 (impotProgressifFloat - reductionImpotsPourChargeFamille)
                 )
+            |> Result.map CFA
 
 
 
@@ -170,7 +154,7 @@ type alias Model =
     { conjointADesRevenus : Bool
     , estMarie : Bool
     , nbEnfants : Int
-    , salaire : MonetaryAmount
+    , salaire : CFA
     }
 
 
@@ -179,7 +163,7 @@ initialModel =
     { conjointADesRevenus = False
     , estMarie = False
     , nbEnfants = 0
-    , salaire = MonetaryAmount currency 630000
+    , salaire = CFA 630000
     }
 
 
@@ -226,11 +210,11 @@ update msg model =
             let
                 newModel =
                     if String.isEmpty str then
-                        { model | salaire = MonetaryAmount currency 0 }
+                        { model | salaire = CFA 0 }
                     else
                         case String.toFloat str of
                             Ok float ->
-                                { model | salaire = MonetaryAmount currency float }
+                                { model | salaire = CFA float }
 
                             Err _ ->
                                 model
@@ -256,14 +240,14 @@ view model =
                 model.salaire
                 baremeImpotProgressif2013
 
-        toFloat (MonetaryAmount _ f) =
+        toFloat (CFA f) =
             f
 
         impotProgressif =
             Scale.compute
                 model.salaire
                 toFloat
-                (MonetaryAmount currency)
+                CFA
                 baremeImpotProgressif2013
 
         nbPartsFloat =
@@ -338,9 +322,9 @@ view model =
                 (toFloat model.salaire)
                 [ ( \salaire ->
                         Scale.compute
-                            (MonetaryAmount currency salaire)
+                            (CFA salaire)
                             toFloat
-                            (MonetaryAmount currency)
+                            CFA
                             baremeImpotProgressif2013
                             |> toFloat
                   , "blue"
@@ -350,21 +334,23 @@ view model =
                             model.estMarie
                             model.conjointADesRevenus
                             model.nbEnfants
-                            (MonetaryAmount currency salaire)
+                            (CFA salaire)
                             baremeImpotProgressif2013
-                            |> Result.withDefault -1
+                            |> Result.withDefault (CFA -1)
+                            |> toFloat
                   , "red"
                   )
                 , ( (\salaire ->
                         reductionImpotsPourChargeFamille
                             (Scale.compute
-                                (MonetaryAmount currency salaire)
+                                (CFA salaire)
                                 toFloat
-                                (MonetaryAmount currency)
+                                CFA
                                 baremeImpotProgressif2013
                             )
                             nbPartsFloat
-                            |> Result.withDefault -1
+                            |> Result.withDefault (CFA -1)
+                            |> toFloat
                     )
                   , "green"
                   )

@@ -1,9 +1,17 @@
 module Types exposing (..)
 
 
-type alias Currency =
-    String
-
-
 type Rate
     = Rate Float
+
+
+
+-- PERIODS
+
+
+type Month
+    = Month Int
+
+
+type alias MonthSerie a =
+    Month -> a

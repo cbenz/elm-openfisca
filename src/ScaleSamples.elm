@@ -2,11 +2,12 @@ module ScaleSamples exposing (..)
 
 import Scale exposing (..)
 import Senegal
+import Types exposing (Euro)
 
 
 baremeImpotFrance2014 =
     scale
-        (MonetaryAmount "€")
+        Euro
         [ ( 0, 0 )
         , ( 6011, 0.055 )
         , ( 11991, 0.14 )
@@ -18,7 +19,7 @@ baremeImpotFrance2014 =
 
 baremeImpotFrance2015 =
     scale
-        (MonetaryAmount "€")
+        Euro
         [ ( 0, 0 )
         , ( 9690, 0.14 )
         , ( 26764, 0.3 )
@@ -29,7 +30,7 @@ baremeImpotFrance2015 =
 
 baremeImpotFrance =
     scaleWithDates
-        (MonetaryAmount "€")
+        Euro
         [ { thresholds =
                 [ ( "2014-01-01", "2015-12-31", 0 )
                 ]

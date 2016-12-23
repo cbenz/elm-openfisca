@@ -38,7 +38,7 @@ scale thresholdTagger brackets =
 
 Example:
     scaleWithDates
-        (MonetaryAmount "€")
+        Euro
         [ { thresholds =
                 [ ( "2014-01-01", "2015-12-31", 0 )
                 ]
