@@ -14,4 +14,4 @@ type Month
 
 
 type alias MonthSerie a =
-    Month -> a
+    Month -> Maybe a

@@ -13,27 +13,23 @@ type EUR
 -- FORMULAS
 
 
-benefit : Month -> MonthSerie EUR -> EUR
+benefit : Month -> MonthSerie EUR -> Maybe EUR
 benefit (Month month) salaire =
-    (List.range 1 3
-        |> List.map (\i -> salaire (Month (month - i)))
-        |> List.map (\(EUR f) -> f)
-        |> List.sum
-    )
-        * 0.7
-        |> EUR
+    Maybe.map3
+        (\(EUR a) (EUR b) (EUR c) ->
+            EUR ((a + b + c) * 0.7)
+        )
+        (salaire (Month (month - 1)))
+        (salaire (Month (month - 2)))
+        (salaire (Month (month - 3)))
 
 
-income : Month -> MonthSerie EUR -> EUR
+income : Month -> MonthSerie EUR -> Maybe EUR
 income month salaire =
-    let
-        (EUR salaireM) =
-            salaire month
-
-        (EUR benefitM) =
-            benefit month salaire
-    in
-        EUR (salaireM + benefitM)
+    Maybe.map2
+        (\(EUR salaire) (EUR benefit) -> EUR (salaire + benefit))
+        (salaire month)
+        (benefit month salaire)
 
 
 
@@ -57,13 +53,9 @@ initialModel =
     }
 
 
-salaireFromData : Dict Int EUR -> Month -> EUR
+salaireFromData : Dict Int EUR -> Month -> Maybe EUR
 salaireFromData salaires =
-    (\(Month month) ->
-        Dict.get month salaires
-            |> Maybe.withDefault (EUR 0)
-     -- TODO Handle Nothing in caller
-    )
+    (\(Month month) -> Dict.get month salaires)
 
 
 
@@ -78,8 +70,10 @@ view model =
     in
         div []
             [ p [] [ text ("Salaire par mois : " ++ (toString model.salaires)) ]
-            , p []
-                [ text ("benefit month_4 = " ++ (toString (benefit (Month 4) salaire))) ]
-            , p []
-                [ text ("income month_4 = " ++ (toString (income (Month 4) salaire))) ]
+            , p [] [ text ("salaire month_1 = " ++ (toString (salaire (Month 1)))) ]
+            , p [] [ text ("benefit month_4 = " ++ (toString (benefit (Month 4) salaire))) ]
+            , p [] [ text ("income month_4 = " ++ (toString (income (Month 4) salaire))) ]
+            , p [] [ text ("salaire month_9 = " ++ (toString (salaire (Month 9)))) ]
+            , p [] [ text ("benefit month_12 = " ++ (toString (benefit (Month 12) salaire))) ]
+            , p [] [ text ("benefit month_6 = " ++ (toString (benefit (Month 6) salaire))) ]
             ]
