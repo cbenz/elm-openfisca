@@ -1,4 +1,4 @@
-module DummyBenefit exposing (..)
+module DummyPeriodBenefit exposing (..)
 
 import Dict exposing (Dict)
 import Html exposing (..)

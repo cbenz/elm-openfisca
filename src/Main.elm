@@ -1,6 +1,7 @@
 module Main exposing (..)
 
-import DummyBenefit
+import DummyHouseholdTax
+import DummyPeriodBenefit
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Senegal
@@ -58,7 +59,12 @@ view model =
         , hr [] []
         , section []
             [ h1 [] [ text "Dummy Benefit" ]
-            , DummyBenefit.view DummyBenefit.initialModel
+            , DummyPeriodBenefit.view DummyPeriodBenefit.initialModel
+            ]
+        , hr [] []
+        , section []
+            [ h1 [] [ text "Dummy Household Tax" ]
+            , DummyHouseholdTax.view DummyHouseholdTax.initialModel
             ]
         , hr [] []
         , section []

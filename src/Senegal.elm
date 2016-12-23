@@ -302,7 +302,7 @@ view model =
             , p []
                 [ text ("nb parts = " ++ (toString nbPartsFloat))
                 ]
-            , Scale.view baremeImpotProgressif2013 toFloat
+            , Scale.view toFloat baremeImpotProgressif2013
             , p []
                 [ text
                     ("impôt progressif = " ++ (toString impotProgressif))

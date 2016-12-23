@@ -15,3 +15,11 @@ type Month
 
 type alias MonthSerie a =
     Month -> Maybe a
+
+
+type Year
+    = Year Int
+
+
+type alias YearSerie a =
+    Year -> Maybe a

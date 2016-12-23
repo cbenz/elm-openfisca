@@ -108,6 +108,7 @@ compute inputValue valueToFloat tagger scale =
 
 atDate : Date -> ScaleWithDates value -> Scale value
 atDate date scale =
+    -- TODO Return Maybe (Scale value) if date returns no bracket?
     let
         findForDate xs =
             List.filterMap
@@ -131,8 +132,8 @@ atDate date scale =
 -- VIEW
 
 
-view : Scale value -> (value -> Float) -> Html msg
-view scale valueToFloat =
+view : (value -> Float) -> Scale value -> Html msg
+view valueToFloat scale =
     let
         tableWithBorders : List (List (Html msg)) -> Html msg
         tableWithBorders rows =
