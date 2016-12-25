@@ -10,6 +10,16 @@ type EUR
     = EUR Float
 
 
+(€+) : EUR -> EUR -> EUR
+(€+) (EUR a) (EUR b) =
+    EUR (a + b)
+
+
+type Entity
+    = FoyerFiscal String
+    | Menage String
+
+
 
 -- FORMULAS
 
@@ -69,52 +79,35 @@ irppScale =
     ]
 
 
-allocationLogement : Year -> YearSerie EUR -> YearSerie EUR -> Maybe EUR
-allocationLogement year salaireIndividu salaireConjoint =
-    Maybe.map2
-        (\(EUR salaireIndividuForYear) (EUR salaireConjointForYear) ->
-            EUR
-                (if salaireIndividuForYear + salaireConjointForYear < 30000 then
-                    2000
-                 else
-                    0
-                )
-        )
-        (salaireIndividu year)
-        (salaireConjoint year)
+allocationLogement : Year -> YearMultiSerie EUR -> EUR
+allocationLogement year salairesMenage =
+    salairesMenage year
+        |> List.map (\(EUR float) -> float)
+        |> List.sum
+        |> (\salairesSum ->
+                EUR
+                    (if salairesSum < 30000 then
+                        2000
+                     else
+                        0
+                    )
+           )
 
 
-irpp : Year -> YearSerie EUR -> YearSerie EUR -> YearSerie EUR -> Maybe EUR
-irpp (Year year) salaireIndividu salaireConjoint salaireEnfant1 =
-    let
-        lastYear =
-            Year (year - 1)
-
-        scaleForYear =
-            Scale.atDate ((toString year) ++ "-01-01") irppScale
-    in
-        Maybe.map3
-            (\(EUR salaireIndividuForLastYear) (EUR salaireConjointForLastYear) (EUR salaireEnfant1ForLastYear) ->
-                let
-                    salaires =
-                        EUR (salaireIndividuForLastYear + salaireConjointForLastYear + salaireEnfant1ForLastYear)
-                in
-                    Scale.compute salaires (\(EUR x) -> x) EUR scaleForYear
-            )
-            (salaireIndividu lastYear)
-            (salaireConjoint lastYear)
-            (salaireEnfant1 lastYear)
+irpp : Year -> YearMultiSerie EUR -> EUR
+irpp (Year year) salairesFoyerFiscal =
+    salairesFoyerFiscal (Year (year - 1))
+        |> List.map (\(EUR float) -> float)
+        |> List.sum
+        |> (\salairesSum ->
+                Scale.atDate ((toString year) ++ "-01-01") irppScale
+                    |> Scale.compute (EUR salairesSum) (\(EUR x) -> x) EUR
+           )
 
 
-revenuDisponible : Year -> YearSerie EUR -> YearSerie EUR -> YearSerie EUR -> Maybe EUR
-revenuDisponible year salaireIndividu salaireConjoint salaireEnfant1 =
-    Maybe.map2
-        (\(EUR irppForYear) (EUR allocationLogementForYear) ->
-            EUR (irppForYear + allocationLogementForYear)
-        )
-        (irpp year salaireIndividu salaireConjoint salaireEnfant1)
-        -- individu of menage is enfant1 of foyer fiscal, and has no conjoint!
-        (allocationLogement year salaireEnfant1 (constantSerie (EUR 0)))
+revenuDisponible : Year -> YearMultiSerie EUR -> YearMultiSerie EUR -> EUR
+revenuDisponible year salairesMenage salairesFoyerFiscal =
+    (irpp year salairesFoyerFiscal) €+ (allocationLogement year salairesMenage)
 
 
 
@@ -122,20 +115,20 @@ revenuDisponible year salaireIndividu salaireConjoint salaireEnfant1 =
 
 
 type alias Model =
-    { salairesIndividu : Dict Int EUR
-    , salairesConjoint : Dict Int EUR
-    , salairesEnfant1 : Dict Int EUR
+    { salairesEnfant1 : Dict Int EUR
+    , salairesParent1 : Dict Int EUR
+    , salairesParent2 : Dict Int EUR
     }
 
 
 initialModel : Model
 initialModel =
-    { salairesIndividu =
+    { salairesParent1 =
         Dict.fromList
             [ ( 2014, EUR 40000 )
             , ( 2015, EUR 40000 )
             ]
-    , salairesConjoint =
+    , salairesParent2 =
         Dict.fromList
             [ ( 2014, EUR 10000 )
             , ( 2015, EUR 15000 )
@@ -149,8 +142,8 @@ initialModel =
 
 
 salaireFromData : Dict Int EUR -> Year -> Maybe EUR
-salaireFromData salaires =
-    (\(Year year) -> Dict.get year salaires)
+salaireFromData salaires (Year year) =
+    Dict.get year salaires
 
 
 
@@ -160,34 +153,97 @@ salaireFromData salaires =
 view : Model -> Html msg
 view model =
     let
-        salaireIndividu =
-            salaireFromData model.salairesIndividu
+        salaireParent1 =
+            salaireFromData model.salairesParent1
 
-        salaireConjoint =
-            salaireFromData model.salairesConjoint
+        salaireParent2 =
+            salaireFromData model.salairesParent2
 
         salaireEnfant1 =
             salaireFromData model.salairesEnfant1
 
+        salaires : Entity -> Year -> List EUR
+        salaires entity year =
+            -- TODO Make this function declarative by storing individuals relationships into the model as data
+            (case entity of
+                FoyerFiscal "1" ->
+                    [ salaireParent1 year
+                    , salaireParent2 year
+                    , salaireEnfant1 year
+                    ]
+
+                Menage "1" ->
+                    [ salaireParent1 year
+                    , salaireParent2 year
+                    ]
+
+                Menage "2" ->
+                    [ salaireEnfant1 year ]
+
+                _ ->
+                    -- TODO Better handle absence of value (return Maybe?)
+                    []
+            )
+                |> List.filterMap identity
+
+        year2015 =
+            Year 2015
+
         scaleForYear =
-            Scale.atDate "2015-01-01" irppScale
+            Scale.atYearStart year2015 irppScale
 
-        allocationLogement2015 =
-            -- individu of menage is enfant1 of foyer fiscal, and has no conjoint!
-            allocationLogement (Year 2015) salaireEnfant1 (constantSerie (EUR 0))
+        allocationLogement2015Menage1 : EUR
+        allocationLogement2015Menage1 =
+            allocationLogement year2015 (salaires (Menage "1"))
 
+        allocationLogement2015Menage2 : EUR
+        allocationLogement2015Menage2 =
+            allocationLogement year2015 (salaires (Menage "2"))
+
+        irpp2015 : EUR
         irpp2015 =
-            irpp (Year 2015) salaireIndividu salaireConjoint salaireEnfant1
+            irpp year2015 (salaires (FoyerFiscal "1"))
 
-        revenuDisponible2015 =
-            revenuDisponible (Year 2015) salaireIndividu salaireConjoint salaireEnfant1
+        revenuDisponible2015Menage1 : EUR
+        revenuDisponible2015Menage1 =
+            revenuDisponible year2015
+                (salaires (Menage "1"))
+                (salaires (FoyerFiscal "1"))
+
+        revenuDisponible2015Menage2 : EUR
+        revenuDisponible2015Menage2 =
+            revenuDisponible year2015
+                (salaires (Menage "2"))
+                (salaires (FoyerFiscal "1"))
     in
         div []
-            [ p [] [ text ("Salaire par an individu : " ++ (toString model.salairesIndividu)) ]
-            , p [] [ text ("Salaire par an conjoint : " ++ (toString model.salairesConjoint)) ]
-            , p [] [ text ("Salaire par an enfant 1 : " ++ (toString model.salairesEnfant1)) ]
+            [ p [] [ text ("Salaires annuels parent_1: " ++ (toString model.salairesParent1)) ]
+            , p [] [ text ("Salaires annuels parent_2 : " ++ (toString model.salairesParent2)) ]
+            , p [] [ text ("Salaires annuels enfant_1 : " ++ (toString model.salairesEnfant1)) ]
             , p [] [ Scale.view (\(EUR x) -> x) scaleForYear ]
-            , p [] [ text ("irpp 2015 = " ++ (toString irpp2015)) ]
-            , p [] [ text ("allocationLogement 2015 = " ++ (toString allocationLogement2015)) ]
-            , p [] [ text ("revenuDisponible 2015 = " ++ (toString revenuDisponible2015)) ]
+            , p [] [ text ("irpp (Year 2015) (FoyerFiscal \"1\") = " ++ (toString irpp2015)) ]
+            , p []
+                [ text
+                    ("allocationLogement (Year 2015) (Menage \"1\") = "
+                        ++ (toString allocationLogement2015Menage1)
+                    )
+                ]
+            , p []
+                [ text
+                    ("allocationLogement (Year 2015) (Menage \"2\") = "
+                        ++ (toString allocationLogement2015Menage2)
+                    )
+                ]
+            , p []
+                [ text
+                    ("revenuDisponible (Year 2015) (Menage \"1\") (FoyerFiscal \"1\") = "
+                        ++ (toString revenuDisponible2015Menage1)
+                    )
+                ]
+            , p []
+                [ text
+                    ("revenuDisponible (Year 2015) (Menage \"2\") (FoyerFiscal \"1\") = "
+                        ++ (toString revenuDisponible2015Menage2)
+                    )
+                ]
             ]

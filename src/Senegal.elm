@@ -227,7 +227,7 @@ view : Model -> Html Msg
 view model =
     let
         baremeImpotProgressif2013 =
-            Scale.atDate "2013-01-01" baremeImpotProgressif
+            Scale.atYearStart (Year 2013) baremeImpotProgressif
 
         impotRevenusResult =
             impotRevenus

@@ -91,6 +91,11 @@ atDate date scale =
             scale
 
 
+atYearStart : Year -> ScaleWithDates value -> Scale value
+atYearStart (Year year) scale =
+    atDate ((toString year) ++ "-01-01") scale
+
+
 
 -- VIEW
 
