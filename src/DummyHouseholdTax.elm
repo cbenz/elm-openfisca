@@ -3,6 +3,8 @@ module DummyHouseholdTax exposing (..)
 import Dict exposing (Dict)
 import EveryDict exposing (EveryDict)
 import Html exposing (..)
+import Numeric
+import Plot exposing (..)
 import Scale exposing (..)
 import Types exposing (..)
 
@@ -251,4 +253,59 @@ view model =
                         ++ (toString revenuDisponible2015Menage2)
                     )
                 ]
+            , viewPlot
+                [ ( \salaire ->
+                        let
+                            (EUR irppFloat) =
+                                irpp year2015 (constantMultiSerie (EUR salaire))
+                        in
+                            irppFloat
+                  , "blue"
+                  )
+                , ( \salaire ->
+                        let
+                            (EUR allocationLogementFloat) =
+                                allocationLogement year2015 (constantMultiSerie (EUR salaire))
+                        in
+                            allocationLogementFloat
+                  , "green"
+                  )
+                , ( \salaire ->
+                        let
+                            (EUR revenuDisponibleFloat) =
+                                revenuDisponible year2015
+                                    (constantMultiSerie (EUR salaire))
+                                    (constantMultiSerie (EUR salaire))
+                        in
+                            revenuDisponibleFloat
+                  , "red"
+                  )
+                ]
             ]
+
+
+viewPlot : List ( Float -> Float, String ) -> Html msg
+viewPlot funcs =
+    let
+        salaires =
+            Numeric.linspace 0 200000 1000
+
+        points func =
+            List.map
+                (\salaire ->
+                    ( salaire
+                    , func salaire
+                    )
+                )
+                salaires
+    in
+        plot [ plotStyle [ ( "padding", "0 0 2em 5em" ) ] ]
+            ([ xAxis [], yAxis [] ]
+                ++ (List.map
+                        (\( func, color ) ->
+                            line [ lineStyle [ ( "fill", "none" ), ( "stroke", color ) ] ]
+                                (points func)
+                        )
+                        funcs
+                   )
+            )

@@ -13,22 +13,27 @@ type Month
     = Month Int
 
 
-type alias MonthSerie a =
-    Month -> Maybe a
+type alias MonthSerie value =
+    Month -> Maybe value
 
 
 type Year
     = Year Int
 
 
-type alias YearSerie a =
-    Year -> Maybe a
+type alias YearSerie value =
+    Year -> Maybe value
 
 
-type alias YearMultiSerie a =
-    Year -> List a
+type alias YearMultiSerie value =
+    Year -> List value
 
 
-constantSerie : value -> a -> Maybe value
+constantSerie : value -> period -> Maybe value
 constantSerie constant =
     always (Just constant)
+
+
+constantMultiSerie : value -> period -> List value
+constantMultiSerie constant =
+    always [ constant ]
