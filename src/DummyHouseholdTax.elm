@@ -1,24 +1,10 @@
 module DummyHouseholdTax exposing (..)
 
 import Dict exposing (Dict)
+import EveryDict exposing (EveryDict)
 import Html exposing (..)
 import Scale exposing (..)
 import Types exposing (..)
-
-
-type EUR
-    = EUR Float
-
-
-(€+) : EUR -> EUR -> EUR
-(€+) (EUR a) (EUR b) =
-    EUR (a + b)
-
-
-type Entity
-    = FoyerFiscal String
-    | Menage String
-
 
 
 -- FORMULAS
@@ -114,36 +100,77 @@ revenuDisponible year salairesMenage salairesFoyerFiscal =
 -- MODEL
 
 
+type EUR
+    = EUR Float
+
+
+(€+) : EUR -> EUR -> EUR
+(€+) (EUR a) (EUR b) =
+    EUR (a + b)
+
+
+type alias Individual =
+    { salaire : Dict Int EUR }
+
+
+type IndividualsGroup
+    = FoyerFiscal String
+    | Menage String
+
+
+type alias Relationships =
+    EveryDict IndividualsGroup (List Individual)
+
+
 type alias Model =
-    { salairesEnfant1 : Dict Int EUR
-    , salairesParent1 : Dict Int EUR
-    , salairesParent2 : Dict Int EUR
+    { individuals : Dict String Individual
+    , relationships : Relationships
     }
 
 
 initialModel : Model
 initialModel =
-    { salairesParent1 =
-        Dict.fromList
-            [ ( 2014, EUR 40000 )
-            , ( 2015, EUR 40000 )
-            ]
-    , salairesParent2 =
-        Dict.fromList
-            [ ( 2014, EUR 10000 )
-            , ( 2015, EUR 15000 )
-            ]
-    , salairesEnfant1 =
-        Dict.fromList
-            [ ( 2014, EUR 20000 )
-            , ( 2015, EUR 15000 )
-            ]
-    }
+    let
+        individualA : Individual
+        individualA =
+            { salaire =
+                Dict.fromList
+                    [ ( 2014, EUR 40000 )
+                    , ( 2015, EUR 40000 )
+                    ]
+            }
 
+        individualB : Individual
+        individualB =
+            { salaire =
+                Dict.fromList
+                    [ ( 2014, EUR 10000 )
+                    , ( 2015, EUR 15000 )
+                    ]
+            }
 
-salaireFromData : Dict Int EUR -> Year -> Maybe EUR
-salaireFromData salaires (Year year) =
-    Dict.get year salaires
+        individualC : Individual
+        individualC =
+            { salaire =
+                Dict.fromList
+                    [ ( 2014, EUR 20000 )
+                    , ( 2015, EUR 15000 )
+                    ]
+            }
+    in
+        { individuals =
+            Dict.fromList
+                [ ( "individualA", individualA )
+                , ( "individualB", individualB )
+                , ( "individualC", individualC )
+                ]
+        , relationships =
+            EveryDict.fromList
+                [ ( FoyerFiscal "1", [ individualA, individualB, individualC ] )
+                , ( Menage "1", [ individualA, individualB ] )
+                , ( Menage "2", [ individualC ] )
+                ]
+        }
 
 
 
@@ -153,44 +180,20 @@ salaireFromData salaires (Year year) =
 view : Model -> Html msg
 view model =
     let
-        salaireParent1 =
-            salaireFromData model.salairesParent1
-
-        salaireParent2 =
-            salaireFromData model.salairesParent2
-
-        salaireEnfant1 =
-            salaireFromData model.salairesEnfant1
-
-        salaires : Entity -> Year -> List EUR
-        salaires entity year =
-            -- TODO Make this function declarative by storing individuals relationships into the model as data
-            (case entity of
-                FoyerFiscal "1" ->
-                    [ salaireParent1 year
-                    , salaireParent2 year
-                    , salaireEnfant1 year
-                    ]
-
-                Menage "1" ->
-                    [ salaireParent1 year
-                    , salaireParent2 year
-                    ]
-
-                Menage "2" ->
-                    [ salaireEnfant1 year ]
-
-                _ ->
-                    -- TODO Better handle absence of value (return Maybe?)
-                    []
-            )
-                |> List.filterMap identity
-
         year2015 =
             Year 2015
 
         scaleForYear =
             Scale.atYearStart year2015 irppScale
+
+        salaires : IndividualsGroup -> YearMultiSerie EUR
+        salaires individualsGroup (Year year) =
+            case EveryDict.get individualsGroup model.relationships of
+                Nothing ->
+                    []
+
+                Just individuals ->
+                    List.filterMap (.salaire >> Dict.get year) individuals
 
         allocationLogement2015Menage1 : EUR
         allocationLogement2015Menage1 =
@@ -217,9 +220,11 @@ view model =
                 (salaires (FoyerFiscal "1"))
     in
         div []
-            [ p [] [ text ("Salaires annuels parent_1: " ++ (toString model.salairesParent1)) ]
-            , p [] [ text ("Salaires annuels parent_2 : " ++ (toString model.salairesParent2)) ]
-            , p [] [ text ("Salaires annuels enfant_1 : " ++ (toString model.salairesEnfant1)) ]
+            [ ul []
+                (model.individuals
+                    |> Dict.toList
+                    |> List.map (\( name, salaires ) -> li [] [ text (name ++ ": " ++ (toString salaires)) ])
+                )
             , p [] [ Scale.view (\(EUR x) -> x) scaleForYear ]
             , p [] [ text ("irpp (Year 2015) (FoyerFiscal \"1\") = " ++ (toString irpp2015)) ]
             , p []
