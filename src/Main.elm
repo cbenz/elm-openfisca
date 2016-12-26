@@ -18,13 +18,18 @@ main =
 
 
 type alias Model =
-    { senegal : Senegal.Model
+    { dummyHouseholdTax : DummyHouseholdTax.Model
+    , dummyPeriodBenefit : DummyPeriodBenefit.Model
+    , senegal : Senegal.Model
     }
 
 
 initialModel : Model
 initialModel =
-    { senegal = Senegal.initialModel }
+    { dummyHouseholdTax = DummyHouseholdTax.initialModel
+    , dummyPeriodBenefit = DummyPeriodBenefit.initialModel
+    , senegal = Senegal.initialModel
+    }
 
 
 type Msg
