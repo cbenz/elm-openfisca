@@ -33,12 +33,22 @@ initialModel =
 
 
 type Msg
-    = SenegalMsg Senegal.Msg
+    = DummyHouseholdTaxMsg DummyHouseholdTax.Msg
+    | SenegalMsg Senegal.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        DummyHouseholdTaxMsg innerMsg ->
+            let
+                ( newChildModel, newChildCmd ) =
+                    DummyHouseholdTax.update innerMsg model.dummyHouseholdTax
+            in
+                ( { model | dummyHouseholdTax = newChildModel }
+                , Cmd.map DummyHouseholdTaxMsg newChildCmd
+                )
+
         SenegalMsg innerMsg ->
             let
                 ( newChildModel, newChildCmd ) =
@@ -69,7 +79,7 @@ view model =
         , hr [] []
         , section []
             [ h1 [] [ text "Dummy Household Tax" ]
-            , DummyHouseholdTax.view DummyHouseholdTax.initialModel
+            , Html.map DummyHouseholdTaxMsg (DummyHouseholdTax.view model.dummyHouseholdTax)
             ]
         , hr [] []
         , section []

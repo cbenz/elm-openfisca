@@ -257,7 +257,6 @@ view model =
                     , input
                         [ Html.Attributes.min "0"
                         , onInput SetSalaire
-                        , step "1000"
                         , type_ "number"
                         , Html.Attributes.value (model.salaire |> toFloat |> toString)
                         ]

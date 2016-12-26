@@ -3,6 +3,8 @@ module DummyHouseholdTax exposing (..)
 import Dict exposing (Dict)
 import EveryDict exposing (EveryDict)
 import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (..)
 import Numeric
 import Plot exposing (..)
 import Scale exposing (..)
@@ -112,7 +114,7 @@ type EUR
 
 
 type alias Individual =
-    { salaire : Dict Int EUR }
+    { salaires : Dict Int EUR }
 
 
 type IndividualsGroup
@@ -120,66 +122,105 @@ type IndividualsGroup
     | Menage String
 
 
-type alias Relationships =
-    EveryDict IndividualsGroup (List Individual)
-
-
 type alias Model =
     { individuals : Dict String Individual
-    , relationships : Relationships
+    , relationships : EveryDict IndividualsGroup (List String)
     }
 
 
 initialModel : Model
 initialModel =
-    let
-        individualA : Individual
-        individualA =
-            { salaire =
-                Dict.fromList
-                    [ ( 2014, EUR 40000 )
-                    , ( 2015, EUR 40000 )
-                    ]
-            }
+    { individuals =
+        Dict.fromList
+            [ ( "individualA"
+              , { salaires =
+                    Dict.fromList
+                        [ ( 2014, EUR 40000 )
+                        , ( 2015, EUR 40000 )
+                        ]
+                }
+              )
+            , ( "individualB"
+              , { salaires =
+                    Dict.fromList
+                        [ ( 2014, EUR 10000 )
+                        , ( 2015, EUR 15000 )
+                        ]
+                }
+              )
+            , ( "individualC"
+              , { salaires =
+                    Dict.fromList
+                        [ ( 2014, EUR 20000 )
+                        , ( 2015, EUR 15000 )
+                        ]
+                }
+              )
+            ]
+    , relationships =
+        EveryDict.fromList
+            [ ( FoyerFiscal "1", [ "individualA", "individualB", "individualC" ] )
+            , ( Menage "1", [ "individualA", "individualB" ] )
+            , ( Menage "2", [ "individualC" ] )
+            ]
+    }
 
-        individualB : Individual
-        individualB =
-            { salaire =
-                Dict.fromList
-                    [ ( 2014, EUR 10000 )
-                    , ( 2015, EUR 15000 )
-                    ]
-            }
 
-        individualC : Individual
-        individualC =
-            { salaire =
-                Dict.fromList
-                    [ ( 2014, EUR 20000 )
-                    , ( 2015, EUR 15000 )
-                    ]
-            }
-    in
-        { individuals =
-            Dict.fromList
-                [ ( "individualA", individualA )
-                , ( "individualB", individualB )
-                , ( "individualC", individualC )
-                ]
-        , relationships =
-            EveryDict.fromList
-                [ ( FoyerFiscal "1", [ individualA, individualB, individualC ] )
-                , ( Menage "1", [ individualA, individualB ] )
-                , ( Menage "2", [ individualC ] )
-                ]
-        }
+
+-- UPDATE
+
+
+type Msg
+    = SetIndividualName String String
+    | SetIndividualSalaire Year String EUR
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        SetIndividualName oldName newName ->
+            let
+                newIndividuals =
+                    case Dict.get oldName model.individuals of
+                        Nothing ->
+                            model.individuals
+
+                        Just individual ->
+                            model.individuals
+                                |> Dict.remove oldName
+                                |> Dict.insert newName individual
+
+                newModel =
+                    { model | individuals = newIndividuals }
+            in
+                ( newModel, Cmd.none )
+
+        SetIndividualSalaire (Year year) name salaire ->
+            let
+                newIndividuals =
+                    Dict.update name
+                        (Maybe.map
+                            (\individual ->
+                                let
+                                    newSalaires =
+                                        Dict.insert year salaire individual.salaires
+                                in
+                                    { individual | salaires = newSalaires }
+                            )
+                        )
+                        model.individuals
+
+                newModel =
+                    { model | individuals = newIndividuals }
+            in
+                ( newModel, Cmd.none )
 
 
 
 -- VIEW
 
 
-view : Model -> Html msg
+view : Model -> Html Msg
 view model =
     let
         year2015 =
@@ -194,8 +235,13 @@ view model =
                 Nothing ->
                     []
 
-                Just individuals ->
-                    List.filterMap (.salaire >> Dict.get year) individuals
+                Just names ->
+                    names
+                        |> List.filterMap
+                            (\name ->
+                                Dict.get name model.individuals
+                                    |> Maybe.andThen (.salaires >> Dict.get year)
+                            )
 
         allocationLogement2015Menage1 : EUR
         allocationLogement2015Menage1 =
@@ -222,11 +268,7 @@ view model =
                 (salaires (FoyerFiscal "1"))
     in
         div []
-            [ ul []
-                (model.individuals
-                    |> Dict.toList
-                    |> List.map (\( name, salaires ) -> li [] [ text (name ++ ": " ++ (toString salaires)) ])
-                )
+            [ viewIndividualsForm model.individuals
             , p [] [ Scale.view (\(EUR x) -> x) scaleForYear ]
             , p [] [ text ("irpp (Year 2015) (FoyerFiscal \"1\") = " ++ (toString irpp2015)) ]
             , p []
@@ -282,6 +324,68 @@ view model =
                   )
                 ]
             ]
+
+
+viewIndividualForm : String -> Individual -> Html Msg
+viewIndividualForm name individual =
+    div []
+        [ label []
+            [ text "name "
+            , input
+                [ onInput (SetIndividualName name)
+                , value name
+                ]
+                []
+            ]
+        , br [] []
+        , label []
+            [ text "salaires"
+            , ul []
+                (individual.salaires
+                    |> Dict.toList
+                    |> List.map
+                        (\( year, EUR salaire ) ->
+                            li []
+                                [ text ("Year " ++ (toString year) ++ " ")
+                                , input
+                                    [ Html.Attributes.min "0"
+                                    , onInput
+                                        (\str ->
+                                            SetIndividualSalaire (Year year)
+                                                name
+                                                (case String.toFloat str of
+                                                    Ok float ->
+                                                        EUR float
+
+                                                    Err _ ->
+                                                        EUR salaire
+                                                )
+                                        )
+                                    , type_ "number"
+                                    , value (toString salaire)
+                                    ]
+                                    []
+                                , text " EUR"
+                                ]
+                        )
+                )
+            ]
+        ]
+
+
+viewIndividualsForm : Dict String Individual -> Html Msg
+viewIndividualsForm individuals =
+    Html.form []
+        [ ul []
+            (individuals
+                |> Dict.toList
+                |> List.map
+                    (\( name, salaires ) ->
+                        li []
+                            [ viewIndividualForm name salaires ]
+                    )
+            )
+        ]
 
 
 viewPlot : List ( Float -> Float, String ) -> Html msg
