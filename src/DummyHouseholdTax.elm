@@ -122,9 +122,13 @@ type IndividualsGroup
     | Menage String
 
 
+type alias Relationships =
+    EveryDict IndividualsGroup (List String)
+
+
 type alias Model =
     { individuals : Dict String Individual
-    , relationships : EveryDict IndividualsGroup (List String)
+    , relationships : Relationships
     }
 
 
@@ -171,13 +175,51 @@ initialModel =
 
 
 type Msg
-    = SetIndividualName String String
+    = AddIndividual
+    | RemoveIndividual String
+    | SetIndividualName String String
     | SetIndividualSalaire Year String EUR
+    | SetRelationship String IndividualsGroup Bool
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        AddIndividual ->
+            let
+                newIndividuals =
+                    Dict.insert "new"
+                        { salaires =
+                            Dict.fromList
+                                [ ( 2014, EUR 0 )
+                                , ( 2015, EUR 0 )
+                                ]
+                        }
+                        model.individuals
+
+                newModel =
+                    { model | individuals = newIndividuals }
+            in
+                ( newModel, Cmd.none )
+
+        RemoveIndividual name ->
+            let
+                newIndividuals =
+                    Dict.remove name model.individuals
+
+                newRelationships =
+                    EveryDict.map
+                        (\individualsGroup names -> List.filter ((/=) name) names)
+                        model.relationships
+
+                newModel =
+                    { model
+                        | individuals = newIndividuals
+                        , relationships = newRelationships
+                    }
+            in
+                ( newModel, Cmd.none )
+
         SetIndividualName oldName newName ->
             let
                 newIndividuals =
@@ -215,6 +257,25 @@ update msg model =
             in
                 ( newModel, Cmd.none )
 
+        SetRelationship name individualsGroup checked ->
+            let
+                newRelationships =
+                    EveryDict.update individualsGroup
+                        (Maybe.map
+                            (\names ->
+                                if checked then
+                                    names ++ [ name ]
+                                else
+                                    List.filter ((/=) name) names
+                            )
+                        )
+                        model.relationships
+
+                newModel =
+                    { model | relationships = newRelationships }
+            in
+                ( newModel, Cmd.none )
+
 
 
 -- VIEW
@@ -249,6 +310,7 @@ view model =
 
         allocationLogement2015Menage2 : EUR
         allocationLogement2015Menage2 =
+            -- TODO Handle menage with no individu
             allocationLogement year2015 (salaires (Menage "2"))
 
         irpp2015 : EUR
@@ -268,7 +330,8 @@ view model =
                 (salaires (FoyerFiscal "1"))
     in
         div []
-            [ viewIndividualsForm model.individuals
+            [ viewIndividuals model.individuals
+            , viewRelationships (Dict.keys model.individuals) model.relationships
             , p [] [ Scale.view (\(EUR x) -> x) scaleForYear ]
             , p [] [ text ("irpp (Year 2015) (FoyerFiscal \"1\") = " ++ (toString irpp2015)) ]
             , p []
@@ -326,8 +389,8 @@ view model =
             ]
 
 
-viewIndividualForm : String -> Individual -> Html Msg
-viewIndividualForm name individual =
+viewIndividual : String -> Individual -> Html Msg
+viewIndividual name individual =
     div []
         [ label []
             [ text "name "
@@ -336,6 +399,7 @@ viewIndividualForm name individual =
                 , value name
                 ]
                 []
+            , button [ onClick (RemoveIndividual name) ] [ text "Remove" ]
             ]
         , br [] []
         , label []
@@ -373,18 +437,19 @@ viewIndividualForm name individual =
         ]
 
 
-viewIndividualsForm : Dict String Individual -> Html Msg
-viewIndividualsForm individuals =
-    Html.form []
+viewIndividuals : Dict String Individual -> Html Msg
+viewIndividuals individuals =
+    div []
         [ ul []
             (individuals
                 |> Dict.toList
                 |> List.map
                     (\( name, salaires ) ->
                         li []
-                            [ viewIndividualForm name salaires ]
+                            [ viewIndividual name salaires ]
                     )
             )
+        , button [ onClick AddIndividual ] [ text "Add individual" ]
         ]
 
 
@@ -413,3 +478,31 @@ viewPlot funcs =
                         funcs
                    )
             )
+
+
+viewRelationships : List String -> Relationships -> Html Msg
+viewRelationships individualNames relationships =
+    ul []
+        (relationships
+            |> EveryDict.toList
+            |> List.map
+                (\( individualsGroup, names ) ->
+                    li []
+                        ((text (toString individualsGroup))
+                            :: (List.map
+                                    (\name ->
+                                        label []
+                                            [ input
+                                                [ checked (List.member name names)
+                                                , onCheck (SetRelationship name individualsGroup)
+                                                , type_ "checkbox"
+                                                ]
+                                                []
+                                            , text name
+                                            ]
+                                    )
+                                    individualNames
+                               )
+                        )
+                )
+        )
