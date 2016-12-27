@@ -79,11 +79,13 @@ view model =
         , hr [] []
         , section []
             [ h1 [] [ text "Dummy Household Tax" ]
-            , Html.map DummyHouseholdTaxMsg (DummyHouseholdTax.view model.dummyHouseholdTax)
+            , DummyHouseholdTax.view model.dummyHouseholdTax
+                |> Html.map DummyHouseholdTaxMsg
             ]
         , hr [] []
         , section []
             [ h1 [] [ text "Sénégal" ]
-            , Html.map SenegalMsg (Senegal.view model.senegal)
+            , Senegal.view model.senegal
+                |> Html.map SenegalMsg
             ]
         ]
