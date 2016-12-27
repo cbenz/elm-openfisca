@@ -72,32 +72,31 @@ irppScale =
 allocationLogement : Year -> YearMultiSerie EUR -> EUR
 allocationLogement year salairesMenage =
     salairesMenage year
-        |> List.map (\(EUR float) -> float)
-        |> List.sum
-        |> (\salairesSum ->
-                EUR
-                    (if salairesSum < 30000 then
-                        2000
-                     else
-                        0
-                    )
-           )
+        |> sumEURList
+        |> mapEUR
+            (\salairesSum ->
+                if salairesSum < 30000 then
+                    2000
+                else
+                    0
+            )
 
 
 irpp : Year -> YearMultiSerie EUR -> EUR
-irpp (Year year) salairesFoyerFiscal =
-    salairesFoyerFiscal (Year (year - 1))
-        |> List.map (\(EUR float) -> float)
-        |> List.sum
+irpp ((Year yearInt) as year) salairesFoyerFiscal =
+    salairesFoyerFiscal (Year (yearInt - 1))
+        |> sumEURList
         |> (\salairesSum ->
-                Scale.atDate ((toString year) ++ "-01-01") irppScale
-                    |> Scale.compute (EUR salairesSum) (\(EUR x) -> x) EUR
+                Scale.atYearStart year irppScale
+                    |> Scale.compute salairesSum (\(EUR x) -> x) EUR
            )
 
 
 revenuDisponible : Year -> YearMultiSerie EUR -> YearMultiSerie EUR -> EUR
 revenuDisponible year salairesMenage salairesFoyerFiscal =
-    (irpp year salairesFoyerFiscal) €+ (allocationLogement year salairesMenage)
+    map2EUR (+)
+        (irpp year salairesFoyerFiscal)
+        (allocationLogement year salairesMenage)
 
 
 
@@ -108,9 +107,19 @@ type EUR
     = EUR Float
 
 
-(€+) : EUR -> EUR -> EUR
-(€+) (EUR a) (EUR b) =
-    EUR (a + b)
+mapEUR : (Float -> Float) -> EUR -> EUR
+mapEUR f (EUR x) =
+    EUR (f x)
+
+
+map2EUR : (Float -> Float -> Float) -> EUR -> EUR -> EUR
+map2EUR f (EUR x) (EUR y) =
+    EUR (f x y)
+
+
+sumEURList : List EUR -> EUR
+sumEURList =
+    (List.map (\(EUR x) -> x)) >> List.sum >> EUR
 
 
 type alias Individual =
