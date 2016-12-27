@@ -1,4 +1,4 @@
-module DummyHouseholdTax exposing (..)
+module DummyTaxBenefitSystem exposing (..)
 
 import Dict exposing (Dict)
 import EveryDict exposing (EveryDict)
@@ -122,8 +122,12 @@ sumEURList =
     (List.map (\(EUR x) -> x)) >> List.sum >> EUR
 
 
-type alias Individual =
+type alias InputValues =
     { salaires : Dict Int EUR }
+
+
+type alias Individual =
+    ( String, InputValues )
 
 
 type IndividualsGroup
@@ -136,40 +140,44 @@ type alias Relationships =
 
 
 type alias Model =
-    { individuals : Dict String Individual
+    { individuals : List Individual
     , relationships : Relationships
     }
+
+
+
+-- TODO Handle menage with no individu (ensure series don't return empty lists leading to (EUR 0) when summing, but return a Maybe)
+-- TODO Ensure that an individual belongs to one and only one entity before computing anything
 
 
 initialModel : Model
 initialModel =
     { individuals =
-        Dict.fromList
-            [ ( "individualA"
-              , { salaires =
-                    Dict.fromList
-                        [ ( 2014, EUR 40000 )
-                        , ( 2015, EUR 40000 )
-                        ]
-                }
-              )
-            , ( "individualB"
-              , { salaires =
-                    Dict.fromList
-                        [ ( 2014, EUR 10000 )
-                        , ( 2015, EUR 15000 )
-                        ]
-                }
-              )
-            , ( "individualC"
-              , { salaires =
-                    Dict.fromList
-                        [ ( 2014, EUR 20000 )
-                        , ( 2015, EUR 15000 )
-                        ]
-                }
-              )
-            ]
+        [ ( "individualA"
+          , { salaires =
+                Dict.fromList
+                    [ ( 2014, EUR 40000 )
+                    , ( 2015, EUR 40000 )
+                    ]
+            }
+          )
+        , ( "individualB"
+          , { salaires =
+                Dict.fromList
+                    [ ( 2014, EUR 10000 )
+                    , ( 2015, EUR 15000 )
+                    ]
+            }
+          )
+        , ( "individualC"
+          , { salaires =
+                Dict.fromList
+                    [ ( 2014, EUR 20000 )
+                    , ( 2015, EUR 15000 )
+                    ]
+            }
+          )
+        ]
     , relationships =
         EveryDict.fromList
             [ ( FoyerFiscal "1", [ "individualA", "individualB", "individualC" ] )
@@ -185,105 +193,160 @@ initialModel =
 
 type Msg
     = AddIndividual
-    | RemoveIndividual String
-    | SetIndividualName String String
-    | SetIndividualSalaire Year String EUR
+    | RemoveIndividual Int
+    | SetIndividualName Int String
+    | SetIndividualSalaire Year Int EUR
     | SetRelationship String IndividualsGroup Bool
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
-        AddIndividual ->
-            let
-                newIndividuals =
-                    Dict.insert "new"
-                        { salaires =
-                            Dict.fromList
-                                [ ( 2014, EUR 0 )
-                                , ( 2015, EUR 0 )
-                                ]
+    let
+        nameAtIndex : Int -> Maybe String
+        nameAtIndex index =
+            model.individuals
+                |> List.indexedMap
+                    (\index1 ( name, _ ) ->
+                        if index == index1 then
+                            Just name
+                        else
+                            Nothing
+                    )
+                |> List.filterMap identity
+                |> List.head
+    in
+        case msg of
+            AddIndividual ->
+                let
+                    newIndividuals =
+                        model.individuals
+                            ++ [ ( "new"
+                                 , { salaires =
+                                        Dict.fromList
+                                            [ ( 2014, EUR 0 )
+                                            , ( 2015, EUR 0 )
+                                            ]
+                                   }
+                                 )
+                               ]
+
+                    newModel =
+                        { model | individuals = newIndividuals }
+                in
+                    ( newModel, Cmd.none )
+
+            RemoveIndividual index ->
+                let
+                    newIndividuals =
+                        model.individuals
+                            |> List.indexedMap
+                                (\index1 individual ->
+                                    if index == index1 then
+                                        Nothing
+                                    else
+                                        Just individual
+                                )
+                            |> List.filterMap identity
+
+                    newRelationships =
+                        case nameAtIndex index of
+                            Nothing ->
+                                model.relationships
+
+                            Just name ->
+                                model.relationships
+                                    |> EveryDict.map (\_ names -> List.filter ((/=) name) names)
+
+                    newModel =
+                        { model
+                            | individuals = newIndividuals
+                            , relationships = newRelationships
                         }
+                in
+                    ( newModel, Cmd.none )
+
+            SetIndividualName index newName ->
+                let
+                    newIndividuals =
                         model.individuals
+                            |> List.indexedMap
+                                (\index1 ( name, values ) ->
+                                    ( if index == index1 then
+                                        newName
+                                      else
+                                        name
+                                    , values
+                                    )
+                                )
 
-                newModel =
-                    { model | individuals = newIndividuals }
-            in
-                ( newModel, Cmd.none )
+                    newRelationships =
+                        case nameAtIndex index of
+                            Nothing ->
+                                model.relationships
 
-        RemoveIndividual name ->
-            let
-                newIndividuals =
-                    Dict.remove name model.individuals
+                            Just oldName ->
+                                model.relationships
+                                    |> EveryDict.map
+                                        (\_ names ->
+                                            names
+                                                |> List.map
+                                                    (\name ->
+                                                        if name == oldName then
+                                                            newName
+                                                        else
+                                                            name
+                                                    )
+                                        )
 
-                newRelationships =
-                    EveryDict.map
-                        (\individualsGroup names -> List.filter ((/=) name) names)
-                        model.relationships
+                    newModel =
+                        { model
+                            | individuals = newIndividuals
+                            , relationships = newRelationships
+                        }
+                in
+                    ( newModel, Cmd.none )
 
-                newModel =
-                    { model
-                        | individuals = newIndividuals
-                        , relationships = newRelationships
-                    }
-            in
-                ( newModel, Cmd.none )
-
-        SetIndividualName oldName newName ->
-            let
-                newIndividuals =
-                    case Dict.get oldName model.individuals of
-                        Nothing ->
-                            model.individuals
-
-                        Just individual ->
-                            model.individuals
-                                |> Dict.remove oldName
-                                |> Dict.insert newName individual
-
-                newModel =
-                    { model | individuals = newIndividuals }
-            in
-                ( newModel, Cmd.none )
-
-        SetIndividualSalaire (Year year) name salaire ->
-            let
-                newIndividuals =
-                    Dict.update name
-                        (Maybe.map
-                            (\individual ->
-                                let
-                                    newSalaires =
-                                        Dict.insert year salaire individual.salaires
-                                in
-                                    { individual | salaires = newSalaires }
-                            )
-                        )
+            SetIndividualSalaire (Year year) index salaire ->
+                let
+                    newIndividuals =
                         model.individuals
+                            |> List.indexedMap
+                                (\index1 ( name, values ) ->
+                                    ( name
+                                    , if index == index1 then
+                                        let
+                                            newSalaires =
+                                                Dict.insert year salaire values.salaires
+                                        in
+                                            { values | salaires = newSalaires }
+                                      else
+                                        values
+                                    )
+                                )
 
-                newModel =
-                    { model | individuals = newIndividuals }
-            in
-                ( newModel, Cmd.none )
+                    newModel =
+                        { model | individuals = newIndividuals }
+                in
+                    ( newModel, Cmd.none )
 
-        SetRelationship name individualsGroup checked ->
-            let
-                newRelationships =
-                    EveryDict.update individualsGroup
-                        (Maybe.map
-                            (\names ->
-                                if checked then
-                                    names ++ [ name ]
-                                else
-                                    List.filter ((/=) name) names
+            SetRelationship name individualsGroup checked ->
+                let
+                    newRelationships =
+                        EveryDict.update individualsGroup
+                            (Maybe.map
+                                (\names ->
+                                    if checked then
+                                        names ++ [ name ]
+                                    else
+                                        List.filter ((/=) name) names
+                                )
                             )
-                        )
-                        model.relationships
+                            model.relationships
 
-                newModel =
-                    { model | relationships = newRelationships }
-            in
-                ( newModel, Cmd.none )
+                    newModel =
+                        { model | relationships = newRelationships }
+                in
+                    ( newModel, Cmd.none )
 
 
 
@@ -309,7 +372,9 @@ view model =
                     names
                         |> List.filterMap
                             (\name ->
-                                Dict.get name model.individuals
+                                model.individuals
+                                    |> Dict.fromList
+                                    |> Dict.get name
                                     |> Maybe.andThen (.salaires >> Dict.get year)
                             )
 
@@ -319,7 +384,6 @@ view model =
 
         allocationLogement2015Menage2 : EUR
         allocationLogement2015Menage2 =
-            -- TODO Handle menage with no individu
             allocationLogement year2015 (salaires (Menage "2"))
 
         irpp2015 : EUR
@@ -340,8 +404,9 @@ view model =
     in
         div []
             [ viewIndividuals model.individuals
-            , viewRelationships (Dict.keys model.individuals) model.relationships
-            , p [] [ Scale.view (\(EUR x) -> x) scaleForYear ]
+            , viewRelationships (List.map Tuple.first model.individuals) model.relationships
+            , p [] [ text "The scale used by irpp:" ]
+            , Scale.view (\(EUR x) -> x) scaleForYear
             , p [] [ text ("irpp (Year 2015) (FoyerFiscal \"1\") = " ++ (toString irpp2015)) ]
             , p []
                 [ text
@@ -367,6 +432,7 @@ view model =
                         ++ (toString revenuDisponible2015Menage2)
                     )
                 ]
+            , p [] [ text "Plot the variation of the salary on X axis:" ]
             , viewPlot
                 [ ( \salaire ->
                         let
@@ -398,17 +464,17 @@ view model =
             ]
 
 
-viewIndividual : String -> Individual -> Html Msg
-viewIndividual name individual =
+viewIndividual : Int -> Individual -> Html Msg
+viewIndividual index ( name, individual ) =
     div []
         [ label []
             [ text "name "
             , input
-                [ onInput (SetIndividualName name)
+                [ onInput (SetIndividualName index)
                 , value name
                 ]
                 []
-            , button [ onClick (RemoveIndividual name) ] [ text "Remove" ]
+            , button [ onClick (RemoveIndividual index) ] [ text "Remove" ]
             ]
         , br [] []
         , label []
@@ -425,7 +491,7 @@ viewIndividual name individual =
                                     , onInput
                                         (\str ->
                                             SetIndividualSalaire (Year year)
-                                                name
+                                                index
                                                 (case String.toFloat str of
                                                     Ok float ->
                                                         EUR float
@@ -446,19 +512,21 @@ viewIndividual name individual =
         ]
 
 
-viewIndividuals : Dict String Individual -> Html Msg
+viewIndividuals : List Individual -> Html Msg
 viewIndividuals individuals =
-    div []
-        [ ul []
-            (individuals
-                |> Dict.toList
-                |> List.map
-                    (\( name, salaires ) ->
-                        li []
-                            [ viewIndividual name salaires ]
-                    )
-            )
-        , button [ onClick AddIndividual ] [ text "Add individual" ]
+    fieldset []
+        [ legend [] [ text "Individuals" ]
+        , div []
+            [ ul []
+                (individuals
+                    |> List.indexedMap
+                        (\index individual ->
+                            li []
+                                [ viewIndividual index individual ]
+                        )
+                )
+            , button [ onClick AddIndividual ] [ text "Add individual" ]
+            ]
         ]
 
 
@@ -491,27 +559,31 @@ viewPlot funcs =
 
 viewRelationships : List String -> Relationships -> Html Msg
 viewRelationships individualNames relationships =
-    ul []
-        (relationships
-            |> EveryDict.toList
-            |> List.map
-                (\( individualsGroup, names ) ->
-                    li []
-                        ((text (toString individualsGroup))
-                            :: (List.map
-                                    (\name ->
-                                        label []
-                                            [ input
-                                                [ checked (List.member name names)
-                                                , onCheck (SetRelationship name individualsGroup)
-                                                , type_ "checkbox"
+    fieldset []
+        [ legend [] [ text "Relationships" ]
+        , p [] [ text "Associate individuals to groups:" ]
+        , ul []
+            (relationships
+                |> EveryDict.toList
+                |> List.map
+                    (\( individualsGroup, names ) ->
+                        li []
+                            ((text (toString individualsGroup))
+                                :: (List.map
+                                        (\name ->
+                                            label []
+                                                [ input
+                                                    [ checked (List.member name names)
+                                                    , onCheck (SetRelationship name individualsGroup)
+                                                    , type_ "checkbox"
+                                                    ]
+                                                    []
+                                                , text name
                                                 ]
-                                                []
-                                            , text name
-                                            ]
-                                    )
-                                    individualNames
-                               )
-                        )
-                )
-        )
+                                        )
+                                        individualNames
+                                   )
+                            )
+                    )
+            )
+        ]

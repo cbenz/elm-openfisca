@@ -25,6 +25,10 @@ type alias YearSerie value =
     Year -> Maybe value
 
 
+
+-- TODO Merge YearSerie and MonthSerie (into a TimeSerie?)
+
+
 type alias YearMultiSerie value =
     Year -> List value
 

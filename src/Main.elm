@@ -1,6 +1,6 @@
 module Main exposing (..)
 
-import DummyHouseholdTax
+import DummyTaxBenefitSystem
 import DummyPeriodBenefit
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -18,7 +18,7 @@ main =
 
 
 type alias Model =
-    { dummyHouseholdTax : DummyHouseholdTax.Model
+    { dummyHouseholdTax : DummyTaxBenefitSystem.Model
     , dummyPeriodBenefit : DummyPeriodBenefit.Model
     , senegal : Senegal.Model
     }
@@ -26,14 +26,14 @@ type alias Model =
 
 initialModel : Model
 initialModel =
-    { dummyHouseholdTax = DummyHouseholdTax.initialModel
+    { dummyHouseholdTax = DummyTaxBenefitSystem.initialModel
     , dummyPeriodBenefit = DummyPeriodBenefit.initialModel
     , senegal = Senegal.initialModel
     }
 
 
 type Msg
-    = DummyHouseholdTaxMsg DummyHouseholdTax.Msg
+    = DummyHouseholdTaxMsg DummyTaxBenefitSystem.Msg
     | SenegalMsg Senegal.Msg
 
 
@@ -43,7 +43,7 @@ update msg model =
         DummyHouseholdTaxMsg innerMsg ->
             let
                 ( newChildModel, newChildCmd ) =
-                    DummyHouseholdTax.update innerMsg model.dummyHouseholdTax
+                    DummyTaxBenefitSystem.update innerMsg model.dummyHouseholdTax
             in
                 ( { model | dummyHouseholdTax = newChildModel }
                 , Cmd.map DummyHouseholdTaxMsg newChildCmd
@@ -64,7 +64,7 @@ view model =
     div [ style [ ( "margin", "1em" ) ] ]
         [ h1 [] [ text "elm-openfisca playground" ]
         , p []
-            [ text "Source code:"
+            [ text "Source code: "
             , let
                 url =
                     "https://github.com/cbenz/elm-openfisca"
@@ -73,14 +73,16 @@ view model =
             ]
         , hr [] []
         , section []
-            [ h1 [] [ text "Dummy Benefit" ]
-            , DummyPeriodBenefit.view DummyPeriodBenefit.initialModel
+            [ h1 [] [ text "Dummy Household Tax" ]
+            , p [] [ text "To test periods, (individuals / groups / relationships), scales and plots." ]
+            , DummyTaxBenefitSystem.view model.dummyHouseholdTax
+                |> Html.map DummyHouseholdTaxMsg
             ]
         , hr [] []
         , section []
-            [ h1 [] [ text "Dummy Household Tax" ]
-            , DummyHouseholdTax.view model.dummyHouseholdTax
-                |> Html.map DummyHouseholdTaxMsg
+            [ h1 [] [ text "Dummy Benefit" ]
+            , p [] [ text "To test periods." ]
+            , DummyPeriodBenefit.view DummyPeriodBenefit.initialModel
             ]
         , hr [] []
         , section []
